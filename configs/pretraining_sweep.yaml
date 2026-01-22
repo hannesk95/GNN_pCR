@@ -1,0 +1,30 @@
+program: pretraining.py
+name: pretraining
+method: grid
+metric:
+  goal: minimize
+  name: train_total_loss
+epochs: 100
+device: 'cuda'
+system: 'msc'
+data_path: '/home/johannes/Data/SSD_2.0TB/GNN_pCR/data/breast_cancer/'
+save_path: '.'
+timepoints: ['T0', 'T1', 'T2', 'T3']
+batch_size: 32
+val_batch_size: 16
+test_batch_size: 1
+filters: [16,32,64,128,256,32]
+mtan_masking: True
+align_labels: [1.0]
+lr: 0.0001
+mode: 'all'
+use_gnn: True
+kaczmarek: True
+janickova: False
+
+
+# parameters:
+#   lr:
+#     values: [0.0001]
+#   mode:
+#     values: ['align', 'temp', 'all']
