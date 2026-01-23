@@ -83,10 +83,10 @@ def plot_umap(z, y, epoch, split):
     plt.scatter(emb[y==1, 0], emb[y==1, 1], s=10, alpha=0.8, label="CR")
     plt.legend()
     plt.title("Latent space (UMAP)")
-    plt.savefig(f"/home/johannes/Data/SSD_2.0TB/GNN_pCR/latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png", dpi=300)
+    plt.savefig(f"./latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png", dpi=300)
     plt.close()
-    mlflow.log_artifact(f"/home/johannes/Data/SSD_2.0TB/GNN_pCR/latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png")
-    os.remove(f"/home/johannes/Data/SSD_2.0TB/GNN_pCR/latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png")
+    mlflow.log_artifact(f"./latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png")
+    os.remove(f"./latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png")
 
 def analyze_latent_space(z, y, epoch, split):
     results = {}
