@@ -120,19 +120,18 @@ class ISPY2(Dataset):
         self.split = split
         self.fold = fold
         self.timepoints = timepoints
-        self.patient_ids = torch.load(f"/home/johannes/Data/SSD_2.0TB/GNN_pCR/data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold][split]        
+        self.patient_ids = torch.load(f"./data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold][split]        
         self.transforms = None
         self.output_2D = output_2D
         self.output_time_dists = output_time_dists
 
         if output_time_dists:
 
-            train_patient_ids = torch.load(f"/home/johannes/Data/SSD_2.0TB/GNN_pCR/data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold]['train']
+            train_patient_ids = torch.load(f"./data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold]['train']
             
             time_diffs = []
             for patient_id in train_patient_ids:
-                files = sorted(glob(f"/home/johannes/Data/SSD_2.0TB/GNN_pCR/data/breast_cancer/data_processed/{patient_id}/*.pt"))
-
+                files = sorted(glob(f"./data/breast_cancer/data_processed/{patient_id}/*.pt"))
                 dates_str = []
                 for file in files:
                     dates_str.append(file.split("/")[-1].split("_")[1])
@@ -187,7 +186,7 @@ class ISPY2(Dataset):
     def __getitem__(self, idx):
         
         patient_id = self.patient_ids[idx]
-        files = sorted(glob(f"/home/johannes/Data/SSD_2.0TB/GNN_pCR/data/breast_cancer/data_processed/{patient_id}/*.pt"))
+        files = sorted(glob(f"./data/breast_cancer/data_processed/{patient_id}/*.pt"))
 
         data_list = []
         data_list_transforms = []
