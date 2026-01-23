@@ -57,11 +57,11 @@ def main(method, timepoints, fold):
     test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints)
 
     # Count samples per class
-    patient_ids = torch.load(f"/home/johannes/Data/SSD_2.0TB/GNN_pCR/data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold]["train"]
+    patient_ids = torch.load(f"./data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold]["train"]
     
     labels = []
     for patient_id in patient_ids:
-        files = sorted(glob(f"/home/johannes/Data/SSD_2.0TB/GNN_pCR/data/breast_cancer/data_processed/{patient_id}/*.pt"))
+        files = sorted(glob(f"./data/breast_cancer/data_processed/{patient_id}/*.pt"))
         label = files[0].split('/')[-1].split('_')[-1].replace('.pt', '')
         labels.append(int(label)) 
     labels = np.array(labels)
