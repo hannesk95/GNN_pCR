@@ -48,40 +48,40 @@ class ResNet18EncoderKaczmarek(nn.Module):
         features_original = features[:, :T//2, :]  # (B, T/2, 512)
         features_transformed = features[:, T//2:, :] 
 
-        if self.training:
-            ##################################
-            # random shuffle along T dimension
-            ##################################
+        # if self.training:
+        ##################################
+        # random shuffle along T dimension
+        ##################################
 
-            # Create independent permutations for each batch element
-            idx = torch.stack([torch.randperm(T//2) for _ in range(B)])
-            labels = ["".join(map(str, row.tolist())) for row in idx]
-            labels = np.array(labels).reshape(-1, 1)
+        # Create independent permutations for each batch element
+        idx = torch.stack([torch.randperm(T//2) for _ in range(B)])
+        labels = ["".join(map(str, row.tolist())) for row in idx]
+        labels = np.array(labels).reshape(-1, 1)
 
-            # Expand idx to match feature dimension
-            idx = idx.unsqueeze(-1).expand(-1, -1, 512)
-            idx = idx.to(features_original.device)
+        # Expand idx to match feature dimension
+        idx = idx.unsqueeze(-1).expand(-1, -1, 512)
+        idx = idx.to(features_original.device)
 
-            # Gather along T dimension
-            features_original = torch.gather(features_original, 1, idx)
-            features_transformed = torch.gather(features_transformed, 1, idx)
+        # Gather along T dimension
+        features_original = torch.gather(features_original, 1, idx)
+        features_transformed = torch.gather(features_transformed, 1, idx)
 
-            # features = torch.cat([features_original, features_transformed], dim=1)  # (B, T, 512)
+        # features = torch.cat([features_original, features_transformed], dim=1)  # (B, T, 512)
 
-            # features = features.view(B, T * 512)  # (B, T*512)
+        # features = features.view(B, T * 512)  # (B, T*512)
 
-            logits = self.cls(features_transformed.view(B, -1))  # (B*T, T!)
-            # logits = logits.view(B, -1)  # (B, T, T!)
-            
-            latent_original = self.projector(features_original.view(B, -1))  # (B*T, 128)
-            latent_transformed = self.projector(features_transformed.view(B, -1))  # (B*T, 128)
-            # latent = latent.view(B, T, -1)  # (B, T, 128)        
+        logits = self.cls(features_transformed.view(B, -1))  # (B*T, T!)
+        # logits = logits.view(B, -1)  # (B, T, T!)
+        
+        latent_original = self.projector(features_original.view(B, -1))  # (B*T, 128)
+        latent_transformed = self.projector(features_transformed.view(B, -1))  # (B*T, 128)
+        # latent = latent.view(B, T, -1)  # (B, T, 128)        
 
-        else:
-            logits = features_original
-            latent_original = features_original
-            latent_transformed = features_transformed
-            labels = features_original
+        # else:
+        #     logits = features_original
+        #     latent_original = features_original
+        #     latent_transformed = features_transformed
+        #     labels = features_original
 
         return logits, latent_original, latent_transformed, labels
 

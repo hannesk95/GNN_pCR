@@ -11,6 +11,8 @@ from torch_geometric.nn.aggr import Aggregation, MultiAggregation
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.typing import Adj, OptPairTensor, Size
+from utils.graph_utils import make_directed_complete_forward_graph
+from torch_geometric.data import Batch
 
 class WeightedSAGEConv(MessagePassing):
     def __init__(
@@ -124,19 +126,21 @@ class TemporalGNN(torch.nn.Module):
         x = self.convs[-1](x, edge_index)
         return x
     
-class ResNet18EncoderGNN(torch.nn.Module):
-    def __init__(self):
-        super(ResNet18EncoderGNN, self).__init__()
+class ResNet18EncoderKiechle(torch.nn.Module):
+    def __init__(self, timepoints):
+        super(ResNet18EncoderKiechle, self).__init__()
         
+        self.timepoints = timepoints
         model = monai.networks.nets.resnet18(spatial_dims=3, n_input_channels=3, num_classes=2)
         encoder_layers = list(model.children())[:-1]
         encoder_layers.append(torch.nn.Flatten(start_dim=1, end_dim=-1))                
         self.encoder = nn.Sequential(*encoder_layers)
 
+        self.gnn = TemporalGNN(in_channels=512, hidden_channels=256, out_channels=128, num_layers=2, aggregation="mean")
+
     def forward(self, images):
         """
         images:   (B, T, 3, D, H, W)
-        edge_index: (2, E)
         """
 
         B, T, C, D, H, W = images.shape
@@ -146,4 +150,25 @@ class ResNet18EncoderGNN(torch.nn.Module):
 
         features = features.view(B, T, -1)  # (B, T, 512)
 
-        return features
+        features_original = features[:, :self.timepoints, :]  # (B, timepoints, 512)
+        features_transformed = features[:, self.timepoints:, :]  # (B, timepoints, 512)
+
+        graph_data_original = make_directed_complete_forward_graph(features_original, batch_size=B)
+        graph_data_original = graph_data_original.to(features.device)
+        graph_data_original = graph_data_original.sort(sort_by_row=False)
+
+        graph_data_transformed = make_directed_complete_forward_graph(features_transformed, batch_size=B)        
+        graph_data_transformed = graph_data_transformed.to(features.device)
+        graph_data_transformed = graph_data_transformed.sort(sort_by_row=False)
+
+        latents_original = self.gnn(graph_data_original.x, graph_data_original.edge_index)  # (B*timepoints, 128)
+        latents_original = latents_original.view(B, -1, latents_original.size(-1))
+        latents_original = latents_original.flatten(start_dim=1) 
+        
+        latents_transformed = self.gnn(graph_data_transformed.x, graph_data_transformed.edge_index)  # (B*timepoints, 128)
+        latents_transformed = latents_transformed.view(B, -1, latents_transformed.size(-1))
+        latents_transformed = latents_transformed.flatten(start_dim=1) 
+        
+        latents = torch.concat([latents_original, latents_transformed], dim=0)
+        
+        return latents

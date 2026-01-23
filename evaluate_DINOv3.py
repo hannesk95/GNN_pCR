@@ -20,7 +20,7 @@ from sklearn.preprocessing import StandardScaler
 import mlflow
 from omegaconf import OmegaConf
 from utils.graph_utils import make_directed_complete_forward_graph
-from models.ResNet18 import ResNet18Encoder
+from models.Janickova import ResNet18Encoder
 from data.Dataset import ISPY2
 from sklearn.decomposition import PCA
 from imblearn.pipeline import Pipeline

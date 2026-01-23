@@ -18,7 +18,7 @@ class Projector(nn.Module):
         x = self.pool(x).flatten(1)
         return self.projector(x)
 
-class ResNet18Encoder(nn.Module):
+class ResNet18EncoderJanickova(nn.Module):
     def __init__(self):
         super().__init__()
 

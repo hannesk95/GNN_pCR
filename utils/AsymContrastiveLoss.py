@@ -25,7 +25,6 @@ class AsymmetricContrastiveLoss(nn.Module):
             labels:   Tensor [B]    - binary labels (1=CR, 0=NR)
         """
 
-        device = z.device
         labels = labels.bool()
         timepoint_dim = z.shape[1] // self.timepoints
 
@@ -49,8 +48,7 @@ class AsymmetricContrastiveLoss(nn.Module):
 
             pos_sim = pos_sim.view(-1)
             pos_sim = pos_sim[~torch.isinf(pos_sim)]
-            loss_pos = pos_sim.mean()
-
+            loss_align_positive = pos_sim.mean()
             
             ortho_loss_list = []
             for i in range(z[labels].shape[0]):
@@ -73,7 +71,7 @@ class AsymmetricContrastiveLoss(nn.Module):
                 # loss_ortho = torch.abs(F.cosine_similarity(z_first, z_last, dim=0))
 
                 ortho_loss_list.append(loss_ortho)
-            ortho_loss = torch.stack(ortho_loss_list).mean()
+            loss_orthogonal = torch.stack(ortho_loss_list).mean()
             
             
             temporal_loss_list = []
@@ -99,13 +97,17 @@ class AsymmetricContrastiveLoss(nn.Module):
                 temporal_loss_list.append(loss_temporal)
             loss_temporal = torch.stack(temporal_loss_list).mean()
             
-            loss_pos = loss_pos + ortho_loss + loss_temporal
+            # loss_pos = loss_pos + ortho_loss + loss_temporal
             
 
             # loss_pos = (1.0 - pos_sim).mean()
         else:
             # loss_pos = torch.tensor(0.0, device=device)
-            loss_pos = z.sum() * 0.0
+            # loss_pos = z.sum() * 0.0
+            # raise ValueError("No positive samples in the batch.")
+            loss_align_positive = z.sum() * 0.0
+            loss_orthogonal = z.sum() * 0.0
+            loss_temporal = z.sum() * 0.0
 
         # ----------------------------------
         # Negative loss (CR vs NR)
@@ -116,12 +118,19 @@ class AsymmetricContrastiveLoss(nn.Module):
 
             neg_sim = z_pos @ z_neg.T
             neg_sim = neg_sim ** 2
-            loss_neg = F.relu(neg_sim + self.margin).mean()
+            loss_align_neg = F.relu(neg_sim + self.margin).mean()
         else:
             # loss_neg = torch.tensor(0.0, device=device)
-            loss_neg = z.sum() * 0.0
+            # loss_neg = z.sum() * 0.0
+            # raise ValueError("No negative samples in the batch.")
+            loss_align_neg = z.sum() * 0.0
 
-        return loss_pos + self.lambda_neg * loss_neg
+        # return loss_pos + self.lambda_neg * loss_neg
+        return {
+            'align': loss_align_positive + self.lambda_neg * loss_align_neg,
+            'orthogonal': loss_orthogonal,
+            'temporal': loss_temporal
+        }
 
 class CRSupervisedContrastiveLoss(nn.Module):
     """
