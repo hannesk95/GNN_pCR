@@ -1,3 +1,20 @@
+import argparse
+import os
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--gpu",
+        type=int,
+        default=0,
+        help="GPU index to use (e.g. 0 or 1)"
+    )
+    return parser.parse_args()
+
+args = parse_args()
+os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+
+
 from glob import glob
 import monai
 import torch
@@ -5,7 +22,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 import numpy as np
-import os
+# import os
 # from data.Dataloader import get_train_dataloaders, get_val_dataloaders
 import argparse
 from utils.pretraining_engine import train_epoch_janickova, eval_epoch_janickova, inference_janickova
@@ -33,12 +50,12 @@ from utils.utils import set_deterministic
 BATCH_SIZE = 16
 ACCUMULATION_STEPS = 4
 EPOCHS = 100
-DEVICE = 'cuda'
 ALIGN_LABELS = [1.0]
 
 def main(method, timepoints, fold):
 
     set_deterministic()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
     # log params
     mlflow.log_param('method', method)    
@@ -48,7 +65,7 @@ def main(method, timepoints, fold):
     mlflow.log_param('batch_size', BATCH_SIZE)
     mlflow.log_param('accumulation_steps', ACCUMULATION_STEPS)
     mlflow.log_param('epochs', EPOCHS) 
-    mlflow.log_param('device', DEVICE)
+    mlflow.log_param('device', device)
     mlflow.log_param('align_labels', ALIGN_LABELS)
 
     # datasets
@@ -88,7 +105,7 @@ def main(method, timepoints, fold):
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
     if method == "kaczmarek":
-        model = ResNet18EncoderKaczmarek(timepoints=timepoints).to(DEVICE)
+        model = ResNet18EncoderKaczmarek(timepoints=timepoints).to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)
 
@@ -98,12 +115,12 @@ def main(method, timepoints, fold):
         enc.fit(np.array(perms).reshape(-1, 1))
 
     elif method == "janickova":
-        model = ResNet18EncoderJanickova().to(DEVICE)
+        model = ResNet18EncoderJanickova().to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)
 
     elif method == "kiechle":
-        model = ResNet18EncoderKiechle(timepoints=timepoints).to(DEVICE)
+        model = ResNet18EncoderKiechle(timepoints=timepoints).to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)        
     
@@ -121,7 +138,7 @@ def main(method, timepoints, fold):
                 model=model,
                 loader=train_dl,
                 optimizer=optimizer,
-                device=DEVICE,
+                device=device,
                 align_labels=ALIGN_LABELS,
                 scaler=scaler,
                 one_hot_encoder=enc,
@@ -133,7 +150,7 @@ def main(method, timepoints, fold):
             val_losses, val_metrics = eval_epoch_kaczmarek(
                 model=model,
                 loader=val_dl,
-                device=DEVICE,
+                device=device,
                 align_labels=ALIGN_LABELS,
                 one_hot_encoder=enc,
                 epoch=epoch
@@ -155,7 +172,7 @@ def main(method, timepoints, fold):
                     loader=train_dl,
                     optimizer=optimizer,
                     timepoints=timepoints,
-                    device=DEVICE,                   
+                    device=device,                   
                     scaler=scaler,                
                     epoch=epoch, 
                     accumulation_steps=ACCUMULATION_STEPS,
@@ -166,7 +183,7 @@ def main(method, timepoints, fold):
                 model=model,                   
                 loader=val_dl,
                 timepoints=timepoints,
-                device=DEVICE,           
+                device=device,           
                 epoch=epoch
             )
 
@@ -187,7 +204,7 @@ def main(method, timepoints, fold):
                 loader=train_dl,
                 optimizer=optimizer,
                 timepoints=timepoints,
-                device=DEVICE,          
+                device=device,          
                 align_labels=ALIGN_LABELS,
                 scaler=scaler,
                 epoch=epoch, 
@@ -199,7 +216,7 @@ def main(method, timepoints, fold):
                 model=model,
                 loader=val_dl,
                 timepoints=timepoints,
-                device=DEVICE,
+                device=device,
                 align_labels=ALIGN_LABELS,
                 scaler=scaler,
                 epoch=epoch
@@ -245,19 +262,19 @@ def main(method, timepoints, fold):
         embeddings, labels = inference_kiechle(
                 model=model,                
                 loader=[train_dl, val_dl, test_dl],
-                device=DEVICE)
+                device=device)
     
     elif method == "kaczmarek":
         embeddings, labels = inference_kaczmarek(
                 model=model,                
                 loader=[train_dl, val_dl, test_dl],
-                device=DEVICE)
+                device=device)
     
     elif method == "janickova":
         embeddings, labels = inference_janickova(
                 model=model,                
                 loader=[train_dl, val_dl, test_dl],
-                device=DEVICE)          
+                device=device)          
 
     X_train, y_train = embeddings["train"], labels["train"]
     X_val, y_val = embeddings["val"], labels["val"]
