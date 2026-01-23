@@ -14,31 +14,21 @@ def parse_args():
 args = parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
-
-from glob import glob
-import monai
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from tqdm import tqdm
+import mlflow
+import itertools
 import numpy as np
-# import os
-# from data.Dataloader import get_train_dataloaders, get_val_dataloaders
-import argparse
+
+from tqdm import tqdm
+from glob import glob
 from utils.pretraining_engine import train_epoch_janickova, eval_epoch_janickova, inference_janickova
 from utils.pretraining_engine import train_epoch_kaczmarek, eval_epoch_kaczmarek, inference_kaczmarek
 from utils.pretraining_engine import train_epoch_kiechle, eval_epoch_kiechle, inference_kiechle
-from models.builder import build_model
-import os
-import random
-from omegaconf import OmegaConf
-import mlflow
 from models.Kiechle import ResNet18EncoderKiechle
 from models.Janickova import ResNet18EncoderJanickova
 from models.Kaczmarek import ResNet18EncoderKaczmarek
 from data.Dataset import ISPY2
-from torch.amp import autocast, GradScaler
-import itertools
+from torch.amp import GradScaler
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
@@ -53,8 +43,7 @@ EPOCHS = 100
 ALIGN_LABELS = [1.0]
 
 def main(method, timepoints, fold):
-
-    set_deterministic()
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
     # log params
@@ -66,7 +55,6 @@ def main(method, timepoints, fold):
     mlflow.log_param('accumulation_steps', ACCUMULATION_STEPS)
     mlflow.log_param('epochs', EPOCHS) 
     mlflow.log_param('device', device)
-    mlflow.log_param('align_labels', ALIGN_LABELS)
 
     # datasets
     train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints)
@@ -153,7 +141,8 @@ def main(method, timepoints, fold):
                 device=device,
                 align_labels=ALIGN_LABELS,
                 one_hot_encoder=enc,
-                epoch=epoch
+                epoch=epoch,
+                accumulation_steps=ACCUMULATION_STEPS
             )
 
             mlflow.log_metric('train_total_loss', train_losses['total'], step=epoch)
@@ -184,7 +173,8 @@ def main(method, timepoints, fold):
                 loader=val_dl,
                 timepoints=timepoints,
                 device=device,           
-                epoch=epoch
+                epoch=epoch,
+                accumulation_steps=ACCUMULATION_STEPS
             )
 
             mlflow.log_metric('train_total_loss', train_losses['total'], step=epoch)            
@@ -253,77 +243,83 @@ def main(method, timepoints, fold):
     mlflow.log_param('best_val_bacc', best_val_metric)
 
     # Test evaluation
-    model.load_state_dict(torch.load('model_best_metric.pt'))
+
+    for checkpoint in ['model_best_loss.pt', 'model_best_metric.pt', 'model_latest_epoch.pt']:
+        checkpoint_name = checkpoint.replace('.pt','')        
+
+        model.load_state_dict(torch.load(checkpoint))        
+
+        if method == "kiechle":
+            embeddings, labels = inference_kiechle(
+                    model=model,                
+                    loader=[train_dl, val_dl, test_dl],
+                    device=device)
+        
+        elif method == "kaczmarek":
+            embeddings, labels = inference_kaczmarek(
+                    model=model,                
+                    loader=[train_dl, val_dl, test_dl],
+                    device=device)
+        
+        elif method == "janickova":
+            embeddings, labels = inference_janickova(
+                    model=model,                
+                    loader=[train_dl, val_dl, test_dl],
+                    device=device)          
+
+        X_train, y_train = embeddings["train"], labels["train"]
+        X_val, y_val = embeddings["val"], labels["val"]
+        X_test, y_test = embeddings["test"], labels["test"]
+
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train.numpy())
+        X_val = scaler.transform(X_val.numpy())
+        X_test = scaler.transform(X_test.numpy())    
+
+        pca = PCA(n_components=0.95)
+        X_train = pca.fit_transform(X_train)
+        X_val = pca.transform(X_val)
+        X_test = pca.transform(X_test) 
+
+        clf = SVC(probability=True)
+        # clf = LogisticRegression(max_iter=1000)
+        clf.fit(X_train, y_train.numpy())
+
+        train_preds = clf.predict(X_train)
+        train_probs = clf.predict_proba(X_train)[:,1]
+        test_preds = clf.predict(X_test)
+        test_probs = clf.predict_proba(X_test)[:,1]
+
+        train_bacc = balanced_accuracy_score(y_train.numpy(), train_preds)
+        train_mcc = matthews_corrcoef(y_train.numpy(), train_preds)
+        train_cm = confusion_matrix(y_train.numpy(), train_preds)   
+        train_sensitivity = train_cm[1,1] / (train_cm[1,0] + train_cm[1,1])
+        train_specificity = train_cm[0,0] / (train_cm[0,0] + train_cm[0,1])
+        train_roc_auc = roc_auc_score(y_train.numpy(), train_probs)
+        mlflow.log_param(f'train_bacc_{checkpoint_name}', train_bacc)
+        mlflow.log_param(f'train_mcc_{checkpoint_name}', train_mcc)
+        mlflow.log_param(f'train_roc_auc_{checkpoint_name}', train_roc_auc)
+        mlflow.log_param(f'train_sensitivity_{checkpoint_name}', train_sensitivity)
+        mlflow.log_param(f'train_specificity_{checkpoint_name}', train_specificity)
+        test_bacc = balanced_accuracy_score(y_test.numpy(), test_preds)
+        test_mcc = matthews_corrcoef(y_test.numpy(), test_preds)
+        test_cm = confusion_matrix(y_test.numpy(), test_preds)   
+        test_sensitivity = test_cm[1,1] / (test_cm[1,0] + test_cm[1,1])
+        test_specificity = test_cm[0,0] / (test_cm[0,0] + test_cm[0,1])
+        test_roc_auc = roc_auc_score(y_test.numpy(), test_probs)
+        mlflow.log_param(f'test_bacc_{checkpoint_name}', test_bacc)
+        mlflow.log_param(f'test_mcc_{checkpoint_name}', test_mcc)
+        mlflow.log_param(f'test_roc_auc_{checkpoint_name}', test_roc_auc)    
+        mlflow.log_param(f'test_sensitivity_{checkpoint_name}', test_sensitivity)
+        mlflow.log_param(f'test_specificity_{checkpoint_name}', test_specificity)
+    
     os.remove('model_best_metric.pt')
     os.remove('model_best_loss.pt')  
     os.remove('model_latest_epoch.pt')
 
-    if method == "kiechle":
-        embeddings, labels = inference_kiechle(
-                model=model,                
-                loader=[train_dl, val_dl, test_dl],
-                device=device)
+if __name__ == '__main__': 
     
-    elif method == "kaczmarek":
-        embeddings, labels = inference_kaczmarek(
-                model=model,                
-                loader=[train_dl, val_dl, test_dl],
-                device=device)
-    
-    elif method == "janickova":
-        embeddings, labels = inference_janickova(
-                model=model,                
-                loader=[train_dl, val_dl, test_dl],
-                device=device)          
-
-    X_train, y_train = embeddings["train"], labels["train"]
-    X_val, y_val = embeddings["val"], labels["val"]
-    X_test, y_test = embeddings["test"], labels["test"]
-
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train.numpy())
-    X_val = scaler.transform(X_val.numpy())
-    X_test = scaler.transform(X_test.numpy())    
-
-    pca = PCA(n_components=0.95)
-    X_train = pca.fit_transform(X_train)
-    X_val = pca.transform(X_val)
-    X_test = pca.transform(X_test) 
-
-    clf = SVC(probability=True)
-    # clf = LogisticRegression(max_iter=1000)
-    clf.fit(X_train, y_train.numpy())
-
-    train_preds = clf.predict(X_train)
-    train_probs = clf.predict_proba(X_train)[:,1]
-    test_preds = clf.predict(X_test)
-    test_probs = clf.predict_proba(X_test)[:,1]
-
-    train_bacc = balanced_accuracy_score(y_train.numpy(), train_preds)
-    train_mcc = matthews_corrcoef(y_train.numpy(), train_preds)
-    train_cm = confusion_matrix(y_train.numpy(), train_preds)   
-    train_sensitivity = train_cm[1,1] / (train_cm[1,0] + train_cm[1,1])
-    train_specificity = train_cm[0,0] / (train_cm[0,0] + train_cm[0,1])
-    train_roc_auc = roc_auc_score(y_train.numpy(), train_probs)
-    mlflow.log_param('train_bacc', train_bacc)
-    mlflow.log_param('train_mcc', train_mcc)
-    mlflow.log_param('train_roc_auc', train_roc_auc)
-    mlflow.log_param('train_sensitivity', train_sensitivity)
-    mlflow.log_param('train_specificity', train_specificity)
-
-    test_bacc = balanced_accuracy_score(y_test.numpy(), test_preds)
-    test_mcc = matthews_corrcoef(y_test.numpy(), test_preds)
-    test_cm = confusion_matrix(y_test.numpy(), test_preds)   
-    test_sensitivity = test_cm[1,1] / (test_cm[1,0] + test_cm[1,1])
-    test_specificity = test_cm[0,0] / (test_cm[0,0] + test_cm[0,1])
-    test_roc_auc = roc_auc_score(y_test.numpy(), test_probs)
-    mlflow.log_param('test_bacc', test_bacc)
-    mlflow.log_param('test_mcc', test_mcc)
-    mlflow.log_param('test_roc_auc', test_roc_auc)    
-    mlflow.log_param('test_sensitivity', test_sensitivity)
-    mlflow.log_param('test_specificity', test_specificity)
-
-if __name__ == '__main__':    
+    set_deterministic()   
     
     for method in ["kiechle", "kaczmarek", "janickova"]:
         for timepoints in [4]:

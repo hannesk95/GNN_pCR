@@ -10,6 +10,7 @@ from torch import Tensor
 from torch_geometric.nn.aggr import Aggregation, MultiAggregation
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
+from torch_geometric.nn.norm import BatchNorm
 from torch_geometric.typing import Adj, OptPairTensor, Size
 from utils.graph_utils import make_directed_complete_forward_graph
 from torch_geometric.data import Batch
@@ -110,20 +111,31 @@ class TemporalGNN(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers, aggregation="mean"):
         super(TemporalGNN, self).__init__()
 
-        AGGREGATION = aggregation # "mean", "max", "add", "lstm"
+        # AGGREGATION = aggregation # "mean", "max", "add", "lstm"
 
-        self.convs = torch.nn.ModuleList()
-        self.convs.append(SAGEConv(in_channels, hidden_channels, aggr=AGGREGATION))
-        for _ in range(num_layers - 2):
-            self.convs.append(SAGEConv(hidden_channels, hidden_channels, aggr=AGGREGATION))
-        self.convs.append(SAGEConv(hidden_channels, out_channels, aggr=AGGREGATION))
+        # self.convs = torch.nn.ModuleList()
+        # self.convs.append(SAGEConv(in_channels, hidden_channels, aggr=AGGREGATION))
+        # for _ in range(num_layers - 2):
+        #     self.convs.append(SAGEConv(hidden_channels, hidden_channels, aggr=AGGREGATION))
+        # self.convs.append(SAGEConv(hidden_channels, out_channels, aggr=AGGREGATION))
+        # self.relu = torch.nn.ReLU()
+
+        self.conv1 = SAGEConv(in_channels, out_channels, aggr=aggregation)
+        self.conv2 = SAGEConv(out_channels, out_channels, aggr=aggregation)
         self.relu = torch.nn.ReLU()
+        self.bn = BatchNorm(out_channels)
 
     def forward(self, x, edge_index):
-        for conv in self.convs[:-1]:
-            x = conv(x, edge_index)
-            x = self.relu(x)
-        x = self.convs[-1](x, edge_index)
+        # for conv in self.convs[:-1]:
+        #     x = conv(x, edge_index)
+        #     x = self.relu(x)
+        # x = self.convs[-1](x, edge_index)
+
+        x = self.conv1(x, edge_index)
+        x = self.bn(x)
+        x = self.relu(x)        
+        x = self.conv2(x, edge_index)
+        
         return x
     
 class ResNet18EncoderKiechle(torch.nn.Module):
@@ -136,7 +148,7 @@ class ResNet18EncoderKiechle(torch.nn.Module):
         encoder_layers.append(torch.nn.Flatten(start_dim=1, end_dim=-1))                
         self.encoder = nn.Sequential(*encoder_layers)
 
-        self.gnn = TemporalGNN(in_channels=512, hidden_channels=256, out_channels=128, num_layers=2, aggregation="mean")
+        self.gnn_projector = TemporalGNN(in_channels=512, hidden_channels=0, out_channels=128, num_layers=0, aggregation="mean")
 
     def forward(self, images):
         """
@@ -161,11 +173,11 @@ class ResNet18EncoderKiechle(torch.nn.Module):
         graph_data_transformed = graph_data_transformed.to(features.device)
         graph_data_transformed = graph_data_transformed.sort(sort_by_row=False)
 
-        latents_original = self.gnn(graph_data_original.x, graph_data_original.edge_index)  # (B*timepoints, 128)
+        latents_original = self.gnn_projector(graph_data_original.x, graph_data_original.edge_index)  # (B*timepoints, 128)
         latents_original = latents_original.view(B, -1, latents_original.size(-1))
         latents_original = latents_original.flatten(start_dim=1) 
         
-        latents_transformed = self.gnn(graph_data_transformed.x, graph_data_transformed.edge_index)  # (B*timepoints, 128)
+        latents_transformed = self.gnn_projector(graph_data_transformed.x, graph_data_transformed.edge_index)  # (B*timepoints, 128)
         latents_transformed = latents_transformed.view(B, -1, latents_transformed.size(-1))
         latents_transformed = latents_transformed.flatten(start_dim=1) 
         

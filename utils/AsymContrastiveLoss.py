@@ -38,73 +38,64 @@ class AsymmetricContrastiveLoss(nn.Module):
         if labels.any():
             # pos_sim = F.cosine_similarity(z[labels], z_aug[labels], dim=1) # only within a single responder patient
             # pos_sim = torch.matmul(z[labels], z_aug[labels].T)
-            pos_sim = z[labels] @ z[labels].T
-            pos_sim = pos_sim ** 2
-            pos_sim = 1.0 - pos_sim
+            # pos_sim = z[labels] @ z[labels].T
+            # pos_sim = pos_sim ** 2
+            # pos_sim = 1.0 - pos_sim
 
-            B = pos_sim.size(0)
-            mask = torch.eye(B, dtype=torch.bool, device=pos_sim.device)
-            pos_sim = pos_sim.masked_fill(mask, float('-inf'))
+            z_positive = z[labels]
+            perm_latents_1 = torch.randperm(z_positive.size(0))
+            z_positive_permuted = z_positive[perm_latents_1]
+            loss_align_positive = 1.0 - nn.functional.cosine_similarity(z_positive, z_positive_permuted, dim=-1).mean()
 
-            pos_sim = pos_sim.view(-1)
-            pos_sim = pos_sim[~torch.isinf(pos_sim)]
-            loss_align_positive = pos_sim.mean()
+            # B = pos_sim.size(0)
+            # mask = torch.eye(B, dtype=torch.bool, device=pos_sim.device)
+            # pos_sim = pos_sim.masked_fill(mask, float('-inf'))
+
+            # pos_sim = pos_sim.view(-1)
+            # pos_sim = pos_sim[~torch.isinf(pos_sim)]
+            # loss_align_positive = pos_sim.mean()
             
             ortho_loss_list = []
             for i in range(z[labels].shape[0]):
-                # z_0 = z[labels][i][:timepoint_dim]
-                # z_0 = F.normalize(z_0, dim=0)
-                # z_1 = z[labels][i][timepoint_dim:2*timepoint_dim]
-                # z_1 = F.normalize(z_1, dim=0)
-                # z_2 = z[labels][i][2*timepoint_dim:]
-                # z_2 = F.normalize(z_2, dim=0)
+                z_0 = z[labels][i][:timepoint_dim]
+                z_1 = z[labels][i][timepoint_dim:2*timepoint_dim]
+                z_2 = z[labels][i][2*timepoint_dim:3*timepoint_dim]
+                z_3 = z[labels][i][-timepoint_dim:]
 
-                # d1 = z_1 - z_0
-                # d2 = z_2 - z_0
-                # d1 = F.normalize(d1, dim=0)
-                # d2 = F.normalize(d2, dim=0)
-                # loss_ortho = (d1 @ d2) ** 2
+                l1 = torch.abs(F.cosine_similarity(z_0, z_1, dim=0))
+                l2 = torch.abs(F.cosine_similarity(z_1, z_2, dim=0))
+                l3 = torch.abs(F.cosine_similarity(z_2, z_3, dim=0))    
 
-                z_first = z[labels][i][:timepoint_dim]
-                z_last = z[labels][i][-timepoint_dim:]
-                loss_ortho = (F.cosine_similarity(z_first, z_last, dim=0)) ** 2
-                # loss_ortho = torch.abs(F.cosine_similarity(z_first, z_last, dim=0))
-
+                loss_ortho = (l1 + l2 + l3) / 3.0
                 ortho_loss_list.append(loss_ortho)
-            loss_orthogonal = torch.stack(ortho_loss_list).mean()
-            
+
+            loss_orthogonal = torch.stack(ortho_loss_list).mean()            
             
             temporal_loss_list = []
             for i in range(z[labels].shape[0]):
-                embeddings = []
-                for t in range(self.timepoints):
-                    emb_t = z[labels][i][t * timepoint_dim : (t + 1) * timepoint_dim]
-                    embeddings.append(emb_t)
+                z_0 = z[labels][i][:timepoint_dim]
+                z_1 = z[labels][i][timepoint_dim:2*timepoint_dim]
+                z_2 = z[labels][i][2*timepoint_dim:3*timepoint_dim]
+                z_3 = z[labels][i][-timepoint_dim:]
+
+                z_10 = z_1 - z_0
+                z_20 = z_2 - z_0
+                z_30 = z_3 - z_0
+
+                z_21 = z_2 - z_1
+                z_31 = z_3 - z_1
+                z_32 = z_3 - z_2
+
+                l1 = 1.0 - F.cosine_similarity(z_10 + z_21 + z_32, z_30, dim=0)
+                l2 = 1.0 - F.cosine_similarity(z_10 + z_21, z_20, dim=0)
+                l3 = 1.0 - F.cosine_similarity(z_21 + z_32, z_31, dim=0)
+
+                loss_temporal = (l1 + l2 + l3) / 3.0
+                temporal_loss_list.append(loss_temporal)                
                 
-                z_first_last = embeddings[-1] - embeddings[0]
-                # z_first_last = F.normalize(z_first_last, dim=0)
-
-                embeddings_diff = []
-                for t in range(0, self.timepoints - 1):
-                    diff = embeddings[t + 1] - embeddings[t]
-                    # diff = F.normalize(diff, dim=0)
-                    embeddings_diff.append(diff)
-                
-                embeddings_diff = sum(embeddings_diff)
-
-                loss_temporal = (F.cosine_similarity(z_first_last, embeddings_diff, dim=0)) ** 2
-                # loss_temporal = torch.abs(F.cosine_similarity(z_first_last, embeddings_diff, dim=0))
-                temporal_loss_list.append(loss_temporal)
-            loss_temporal = torch.stack(temporal_loss_list).mean()
+            loss_temporal = torch.stack(temporal_loss_list).mean()            
             
-            # loss_pos = loss_pos + ortho_loss + loss_temporal
-            
-
-            # loss_pos = (1.0 - pos_sim).mean()
-        else:
-            # loss_pos = torch.tensor(0.0, device=device)
-            # loss_pos = z.sum() * 0.0
-            # raise ValueError("No positive samples in the batch.")
+        else:            
             loss_align_positive = z.sum() * 0.0
             loss_orthogonal = z.sum() * 0.0
             loss_temporal = z.sum() * 0.0
@@ -116,18 +107,31 @@ class AsymmetricContrastiveLoss(nn.Module):
             z_pos = z[labels]         # responders
             z_neg = z[~labels]       # non-responders
 
-            neg_sim = z_pos @ z_neg.T
-            neg_sim = neg_sim ** 2
-            loss_align_neg = F.relu(neg_sim + self.margin).mean()
-        else:
-            # loss_neg = torch.tensor(0.0, device=device)
-            # loss_neg = z.sum() * 0.0
-            # raise ValueError("No negative samples in the batch.")
-            loss_align_neg = z.sum() * 0.0
+            # neg_sim = z_pos @ z_neg.T
+            # loss_align_negative = torch.abs(neg_sim).mean()
+            # loss_align_negative = F.relu(neg_sim + self.margin).mean()
 
-        # return loss_pos + self.lambda_neg * loss_neg
+            n_pos = z_pos.size(0)
+            n_neg = z_neg.size(0)
+
+            if n_neg < n_pos:
+                permutation = torch.randperm(z_pos.size(0))
+                z_pos = z_pos[permutation]
+                z_pos = z_pos[:z_neg.shape[0], :]
+            elif n_pos < n_neg:
+                permutation = torch.randperm(z_neg.size(0))
+                z_neg = z_neg[permutation]
+                z_neg = z_neg[:z_pos.shape[0], :]
+            else:
+                pass # equal sizes            
+
+            loss_align_negative = nn.functional.cosine_similarity(z_pos, z_neg, dim=-1).mean()
+
+        else:            
+            loss_align_negative = z.sum() * 0.0
+
         return {
-            'align': loss_align_positive + self.lambda_neg * loss_align_neg,
+            'align': loss_align_positive + loss_align_negative,
             'orthogonal': loss_orthogonal,
             'temporal': loss_temporal
         }

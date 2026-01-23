@@ -266,6 +266,7 @@ def eval_epoch_kaczmarek(
         align_labels: list = [1.0],        
         one_hot_encoder = None,
         epoch = None,
+        accumulation_steps = None,
 ):
     """
     Evaluate the model for one epoch.
@@ -312,8 +313,8 @@ def eval_epoch_kaczmarek(
                 loss_temporal = ce_loss(logits, labels_oh)
                 loss_align = compute_alignment_loss(latents_original, latents_transformed, labels, align_labels) 
             
-            loss_temporal = loss_temporal
-            loss_align = loss_align
+            loss_temporal = loss_temporal / accumulation_steps
+            loss_align = loss_align / accumulation_steps
             loss = loss_temporal + loss_align
 
             loss_temporal_epoch.append(loss_temporal.item())
@@ -493,6 +494,7 @@ def eval_epoch_kiechle(
         timepoints: int,
         device: torch.device = 'cuda',
         epoch = None,
+        accumulation_steps = None,
 ):
     """
     Evaluate the GNN model for one epoch.
@@ -536,9 +538,9 @@ def eval_epoch_kiechle(
                 labels_twice = torch.concat([labels, labels], dim=0)
                 losses = loss_fn(latents, labels_twice)        
             
-            loss_align = losses['align']
-            loss_temporal = losses['temporal'] 
-            loss_orthogonal = losses['orthogonal'] 
+            loss_align = losses['align'] / accumulation_steps
+            loss_temporal = losses['temporal'] / accumulation_steps
+            loss_orthogonal = losses['orthogonal'] / accumulation_steps
             loss = loss_align + loss_temporal + loss_orthogonal
 
             loss_align_epoch.append(loss_align.item())
