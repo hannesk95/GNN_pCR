@@ -1,3 +1,19 @@
+import argparse
+import os
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--gpu",
+        type=int,
+        default=0,
+        help="GPU index to use (e.g. 0 or 1)"
+    )
+    return parser.parse_args()
+
+args = parse_args()
+os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+
 import os
 import torch
 import mlflow
