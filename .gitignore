@@ -1,0 +1,21 @@
+# directories
+mlruns/
+conda_env/
+_delete/
+
+# files
+*.pyc
+*.pt
+*.nii.gz
+*.nii
+*.csv
+*.xlsx
+*.txt
+*.json
+*.bvec
+*.bval
+*.mat
+*.tfm
+*.png
+*.pkl
+*.zip
