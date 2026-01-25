@@ -35,7 +35,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score, matthews_corrcoef, confusion_matrix, roc_auc_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from utils.utils import set_deterministic
+from utils.utils import set_deterministic, log_all_python_files
 
 BATCH_SIZE = 16
 ACCUMULATION_STEPS = 4
@@ -153,7 +153,6 @@ def main(method, timepoints, fold):
             mlflow.log_metric('val_align_loss', val_losses['align'], step=epoch)
             mlflow.log_metric('val_temporal_loss', val_losses['temporal'], step=epoch)
             
-
         elif method == "kiechle":                
             
             train_losses = train_epoch_kiechle(
@@ -208,8 +207,8 @@ def main(method, timepoints, fold):
                 timepoints=timepoints,
                 device=device,
                 align_labels=ALIGN_LABELS,
-                scaler=scaler,
-                epoch=epoch
+                epoch=epoch,
+                accumulation_steps=ACCUMULATION_STEPS,
             )
 
             mlflow.log_metric('train_total_loss', train_losses['total'], step=epoch)
@@ -320,8 +319,10 @@ def main(method, timepoints, fold):
 if __name__ == '__main__': 
     
     set_deterministic()   
+    log_all_python_files()
     
-    for method in ["kiechle", "kaczmarek", "janickova"]:
+    # for method in ["janickova", "kaczmarek", "kiechle"]:
+    for method in ["kiechle"]:
         for timepoints in [4]:
             for fold in range(5):
 

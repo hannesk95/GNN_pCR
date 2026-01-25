@@ -14,12 +14,13 @@ def train_epoch_janickova(
         model: nn.Module,
         loader: DataLoader,
         optimizer: torch.optim.Optimizer,
-        temporal_distances_mapping: dict = {'T0': 1.0, 'T1': 0.75, 'T2': 0.5, 'T3': 0.25},
         timepoints: list = ['T0', 'T1', 'T2', 'T3'],
-        align_labels: list = [1.0],
-        mode: str = 'all',
         device: torch.device = 'cuda',
+        align_labels: list = [1.0],
         scaler = None,
+        epoch = None,
+        accumulation_steps = None,
+        lr_scheduler = None
         
 ):
     """
@@ -43,16 +44,14 @@ def train_epoch_janickova(
     """
     model.train()
 
-    loss_temp_epoch = []
-    loss_sup_epoch = []
-    loss_total_epoch = []
-    
+    loss_temporal_epoch = []
+    loss_align_epoch = []
+    loss_total_epoch = []    
 
     temporal_distances_mapping = [1.0, 0.75, 0.5, 0.25]
+    optimizer.zero_grad()
 
-    for batch_data in tqdm(loader):
-
-        optimizer.zero_grad()
+    for step, batch_data in tqdm(enumerate(loader), total=len(loader)):        
         
         images = batch_data[0].float().to(device)
         labels = batch_data[1].long().to(device)        
@@ -64,7 +63,8 @@ def train_epoch_janickova(
             latents_original = latents[:, :timepoints, :]
             latents_transformed = latents[:, timepoints:, :]
 
-            loss = 0.0
+            loss_temporal_running = 0.0
+            loss_align_running = 0.0
             for i in range(timepoints):
                 for j in range(timepoints):
                     if i != j:                        
@@ -74,36 +74,49 @@ def train_epoch_janickova(
                         latent_3 = latents_original[:, j, :]
                         margin = np.abs(temporal_distances_mapping[i] - temporal_distances_mapping[j])
 
-                        # Compute the temporal loss
-                        loss_temp = compute_temporal_loss(latent_1, latent_2, latent_3, margin)
-                        loss_temp_epoch.append(loss_temp.item())
+                        # Compute losses
+                        loss_temporal = compute_temporal_loss(latent_1, latent_2, latent_3, margin)                        
+                        loss_align = compute_alignment_loss(latent_1, latent_2, labels, align_labels)   
 
-                        # Compute the alignment loss for the given labels
-                        loss_align_total = compute_alignment_loss(latent_1, latent_2, labels, align_labels)                        
-                        loss_sup_epoch.append(loss_align_total.item())                        
+                        loss_temporal_running += loss_temporal
+                        loss_align_running += loss_align                     
+                                               
 
-                        # Combine losses
-                        loss = loss + loss_temp + loss_align_total
-                        loss_total_epoch.append(loss.item())
-           
+        loss_temporal = loss_temporal_running / accumulation_steps
+        loss_align = loss_align_running / accumulation_steps
+        loss = loss_temporal + loss_align
         scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()        
+
+        loss_temporal_epoch.append(loss_temporal.item())
+        loss_align_epoch.append(loss_align.item()) 
+        loss_total_epoch.append(loss.item())
+           
+        
+        # perform optimizer step every accum_steps
+        if (step + 1) % accumulation_steps == 0:
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
+    
+    if lr_scheduler is not None:
+        mlflow.log_metric('lr', lr_scheduler.get_last_lr()[0], step=epoch)        
+        lr_scheduler.step()                
 
     # Return the average loss values for the epoch
     return {
         'total': sum(loss_total_epoch) / len(loss_total_epoch),
-        'temporal': sum(loss_temp_epoch) / len(loss_temp_epoch),
-        'align': sum(loss_sup_epoch) / len(loss_sup_epoch),
+        'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch),
+        'align': sum(loss_align_epoch) / len(loss_align_epoch),
     }
 
 def eval_epoch_janickova(
         model: nn.Module,
         loader: DataLoader,
-        temporal_distances_mapping: dict = {'T0': 1.0, 'T1': 0.75, 'T2': 0.5, 'T3': 0.25},
         timepoints: list = ['T0', 'T1', 'T2', 'T3'],
+        device: torch.device = 'cuda',
         align_labels: list = [1.0],
-        device: torch.device = 'cuda'        
+        epoch = None,
+        accumulation_steps = None,
 ):
     """
     Evaluate the model for one epoch.
@@ -126,9 +139,11 @@ def eval_epoch_janickova(
     """
     model.eval()
 
-    loss_temp_epoch = []
-    loss_sup_epoch = []
-    loss_total_epoch = []
+    loss_temporal_epoch = []
+    loss_align_epoch = []
+    loss_total_epoch = []    
+
+    zs, ys = [], []
 
     temporal_distances_mapping = [1.0, 0.75, 0.5, 0.25]
 
@@ -136,8 +151,10 @@ def eval_epoch_janickova(
         for batch_data in tqdm(loader):
         
             images = batch_data[0].float().to(device)
-            labels = batch_data[1].long().to(device) 
+            labels = batch_data[1].long().to(device)     
 
+            B, T, C, D, H, W = images.shape    
+            
             with torch.amp.autocast("cuda"):
                 latents = model(images)
                 latents = nn.functional.normalize(latents)
@@ -145,7 +162,8 @@ def eval_epoch_janickova(
                 latents_original = latents[:, :timepoints, :]
                 latents_transformed = latents[:, timepoints:, :]
 
-                loss = 0.0
+                loss_temporal_running = 0.0
+                loss_align_running = 0.0
                 for i in range(timepoints):
                     for j in range(timepoints):
                         if i != j:                        
@@ -155,27 +173,115 @@ def eval_epoch_janickova(
                             latent_3 = latents_original[:, j, :]
                             margin = np.abs(temporal_distances_mapping[i] - temporal_distances_mapping[j])
 
-                            # Compute the temporal loss
-                            loss_temp = compute_temporal_loss(latent_1, latent_2, latent_3, margin)
-                            loss_temp_epoch.append(loss_temp.item())
+                            # Compute losses
+                            loss_temporal = compute_temporal_loss(latent_1, latent_2, latent_3, margin)                        
+                            loss_align = compute_alignment_loss(latent_1, latent_2, labels, align_labels)   
 
-                            # Compute the alignment loss for the given labels
-                            loss_align_total = compute_alignment_loss(latent_1, latent_2, labels, align_labels)                        
-                            loss_sup_epoch.append(loss_align_total.item())                        
+                            loss_temporal_running += loss_temporal
+                            loss_align_running += loss_align                                                
 
-                            # Combine losses
-                            loss = loss + loss_temp + loss_align_total
-                            loss_total_epoch.append(loss.item())    
+            loss_temporal = loss_temporal_running / accumulation_steps
+            loss_align = loss_align_running / accumulation_steps
+            loss = loss_temporal + loss_align
 
-    # Return the average loss values for the epoch
-    return {
-        'total': sum(loss_total_epoch) / len(loss_total_epoch),
-        'temporal': sum(loss_temp_epoch) / len(loss_temp_epoch),
-        'align': sum(loss_sup_epoch) / len(loss_sup_epoch),
+            loss_temporal_epoch.append(loss_temporal.item())
+            loss_align_epoch.append(loss_align.item()) 
+            loss_total_epoch.append(loss.item())     
+
+            latents_original = latents_original.view(B, -1)
+            zs.append(latents_original[:B, :].cpu())
+            ys.append(labels.cpu()) 
+        
+        results = analyze_latent_space(torch.cat(zs), torch.cat(ys), epoch=epoch, split="val")
+        
+        losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
+                  'align': sum(loss_align_epoch) / len(loss_align_epoch),
+                  'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch)}
+        
+        metrics = {'val_auc': results['linear_probe_auc'],
+                   'val_bacc': results['linear_probe_bacc']}
+    
+    return losses, metrics        
+
+def inference_janickova(
+        model: nn.Module,                
+        loader: DataLoader,
+        device: torch.device = 'cuda'
+):
+    model.eval()
+    
+    z_train, y_train = [], []
+    
+    with torch.no_grad():
+        for batch_data in tqdm(loader[0]):
+            
+            images = batch_data[0].float().to(device)
+            labels = batch_data[1].long().to(device)
+
+            B, T, C, D, H, W = images.shape      
+            
+            latents = model(images)                
+            latents = nn.functional.normalize(latents, dim=-1)   
+            latents = latents[:B, :T, :].reshape(B, -1)             
+
+            z_train.append(latents[:B, :].cpu())
+            y_train.append(labels.cpu())
+    
+    z_train = torch.cat(z_train)
+    y_train = torch.cat(y_train)
+    
+    z_val, y_val = [], []
+    
+    with torch.no_grad():
+        for batch_data in tqdm(loader[1]):
+            
+            images = batch_data[0].float().to(device)
+            labels = batch_data[1].long().to(device) 
+
+            B, T, C, D, H, W = images.shape     
+            
+            latents = model(images)                
+            latents = nn.functional.normalize(latents, dim=-1)
+            latents = latents[:B, :T, :].reshape(B, -1)                     
+
+            z_val.append(latents[:B, :].cpu())
+            y_val.append(labels.cpu())
+    
+    z_val = torch.cat(z_val)
+    y_val = torch.cat(y_val)
+    
+    z_test, y_test = [], []
+
+    with torch.no_grad():
+        for batch_data in tqdm(loader[2]):
+            
+            images = batch_data[0].float().to(device)
+            labels = batch_data[1].long().to(device) 
+
+            B, T, C, D, H, W = images.shape     
+            
+            latents = model(images)                
+            latents = nn.functional.normalize(latents, dim=-1)   
+            latents = latents[:B, :T, :].reshape(B, -1)                  
+
+            z_test.append(latents[:B, :].cpu())
+            y_test.append(labels.cpu())
+    
+    z_test = torch.cat(z_test)
+    y_test = torch.cat(y_test)
+    
+    embeddings = {
+        'train': z_train,
+        'val': z_val,
+        'test': z_test
     }
-
-def inference_janickova():
-    pass
+    
+    labels = {
+        'train': y_train,
+        'val': y_val,
+        'test': y_test
+    }
+    return embeddings, labels
 
 def train_epoch_kaczmarek(
         model: nn.Module,
@@ -552,6 +658,7 @@ def eval_epoch_kiechle(
             ys.append(labels.cpu())
         
         results = analyze_latent_space(torch.cat(zs), torch.cat(ys), epoch=epoch, split="val")
+        
         losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
                   'align': sum(loss_align_epoch) / len(loss_align_epoch),
                   'orthogonal': sum(loss_orthogonal_epoch) / len(loss_orthogonal_epoch),

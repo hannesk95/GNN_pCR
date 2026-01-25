@@ -167,11 +167,11 @@ class ResNet18EncoderKiechle(torch.nn.Module):
 
         graph_data_original = make_directed_complete_forward_graph(features_original, batch_size=B)
         graph_data_original = graph_data_original.to(features.device)
-        graph_data_original = graph_data_original.sort(sort_by_row=False)
+        # graph_data_original = graph_data_original.sort(sort_by_row=False)
 
         graph_data_transformed = make_directed_complete_forward_graph(features_transformed, batch_size=B)        
         graph_data_transformed = graph_data_transformed.to(features.device)
-        graph_data_transformed = graph_data_transformed.sort(sort_by_row=False)
+        # graph_data_transformed = graph_data_transformed.sort(sort_by_row=False)
 
         latents_original = self.gnn_projector(graph_data_original.x, graph_data_original.edge_index)  # (B*timepoints, 128)
         latents_original = latents_original.view(B, -1, latents_original.size(-1))
