@@ -44,6 +44,8 @@ ALIGN_LABELS = [1.0]
 
 def main(method, timepoints, fold):
     
+    set_deterministic()   
+    log_all_python_files()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
     # log params
@@ -316,17 +318,14 @@ def main(method, timepoints, fold):
     os.remove('model_best_loss.pt')  
     os.remove('model_latest_epoch.pt')
 
-if __name__ == '__main__': 
+if __name__ == '__main__':   
     
-    set_deterministic()   
-    log_all_python_files()
-    
-    # for method in ["janickova", "kaczmarek", "kiechle"]:
-    for method in ["kiechle"]:
+    for method in ["kiechle", "kaczmarek", "janickova"]:
         for timepoints in [4]:
             for fold in range(5):
 
                 mlflow.set_experiment("self-supervised-pretraining")
 
+                mlflow.end_run()  # end previous run if any
                 with mlflow.start_run():
                     main(method, timepoints, fold)
