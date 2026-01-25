@@ -98,6 +98,11 @@ def train_epoch_janickova(
             scaler.update()
             optimizer.zero_grad()
     
+    if (step + 1) % accumulation_steps != 0:
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad()
+    
     if lr_scheduler is not None:
         mlflow.log_metric('lr', lr_scheduler.get_last_lr()[0], step=epoch)        
         lr_scheduler.step()                
@@ -353,6 +358,11 @@ def train_epoch_kaczmarek(
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
+    
+    if (step + 1) % accumulation_steps != 0:
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad()
 
     if lr_scheduler is not None:
         mlflow.log_metric('lr', lr_scheduler.get_last_lr()[0], step=epoch)        
@@ -581,7 +591,12 @@ def train_epoch_kiechle(
         if (step + 1) % accumulation_steps == 0:
             scaler.step(optimizer)
             scaler.update()
-            optimizer.zero_grad()    
+            optimizer.zero_grad()   
+
+    if (step + 1) % accumulation_steps != 0:
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad()
     
     if lr_scheduler is not None:
         mlflow.log_metric('lr', lr_scheduler.get_last_lr()[0], step=epoch)        

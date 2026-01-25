@@ -134,7 +134,7 @@ def main(method, timepoints, fold):
                     logits = model(images)
                 
                 loss = loss_fn(logits, labels)
-                logits = logits.to(torch.float32)
+                logits = logits.detach()
                 preds = torch.argmax(logits, dim=1)
                 scores = torch.softmax(logits, dim=1)[:, 1]
 
@@ -149,6 +149,11 @@ def main(method, timepoints, fold):
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()
+        
+        if (step + 1) % ACCUMULATION_STEPS != 0:
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
 
         val_loss_list = []
         val_true_list = []
@@ -169,7 +174,7 @@ def main(method, timepoints, fold):
                         logits = model(images)
                     
                     loss = loss_fn(logits, labels)
-                    logits = logits.to(torch.float32)
+                    logits = logits.detach()
                     preds = torch.argmax(logits, dim=1)
                     scores = torch.softmax(logits, dim=1)[:, 1]
             
@@ -255,7 +260,7 @@ def main(method, timepoints, fold):
                     logits = model(images)
                 
                 loss = loss_fn(logits, labels)
-                logits = logits.to(torch.float32)
+                logits = logits.detach()
                 preds = torch.argmax(logits, dim=1)
                 scores = torch.softmax(logits, dim=1)[:, 1]
         
@@ -296,5 +301,6 @@ if __name__ == "__main__":
 
                 mlflow.set_experiment("end-to-end")
 
+                mlflow.end_run()  # end previous run if any
                 with mlflow.start_run():
                     main(method, timepoints, fold)
