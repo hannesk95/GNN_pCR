@@ -41,7 +41,7 @@ EPOCHS = 100
 
 def main(method, timepoints, fold):   
 
-    set_deterministic()  
+    # set_deterministic()  
     log_all_python_files()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -293,6 +293,8 @@ def main(method, timepoints, fold):
     
 
 if __name__ == "__main__":    
+
+    set_deterministic()  
 
     for method in ["CNN", "CNN_LSTM", "CNN_distLSTM"]:
         for timepoints in [4]:
