@@ -1,3 +1,4 @@
+from importlib_metadata import files
 import torch
 import nibabel as nib
 from torch.utils.data import Dataset
@@ -30,7 +31,6 @@ class SplitMRIAndMask(MapTransform):
         d["mask"] = x[2:3]              # keep channel dim
         return d
 
-
 class Recombine(MapTransform):
     def __init__(self, keys):
         super().__init__(keys)
@@ -38,7 +38,6 @@ class Recombine(MapTransform):
         d = dict(data)
         d["image"] = torch.cat([d["mri"], d["mask"]], dim=0)
         return d
-
 
 class ISPY2MIPParametric(Dataset):
 
@@ -113,7 +112,6 @@ class ISPY2MIPParametric(Dataset):
                     data_dict[t] = self.augmentation(data_dict.get(t))
         return  data_dict
 
-
 class ISPY2(Dataset):
     def __init__(self, split: str, fold: int, timepoints: int, output_2D: bool = False, output_time_dists: bool = False):
 
@@ -146,7 +144,7 @@ class ISPY2(Dataset):
             self.scaler = StandardScaler()
             self.scaler.fit(time_diffs)
         
-        if split in ["train", "val", "test"]:
+        if split in ["train"]:
             self.transforms = Compose([
 
                 SplitMRIAndMask(keys=["image"]),
@@ -180,6 +178,8 @@ class ISPY2(Dataset):
                 EnsureTypeD(keys=["image"]),
             ])            
 
+            self.transforms.set_random_state(seed=42)  # for reproducibility
+
     def __len__(self):
         return len(self.patient_ids)
 
@@ -188,12 +188,14 @@ class ISPY2(Dataset):
         patient_id = self.patient_ids[idx]
         files = sorted(glob(f"./data/breast_cancer/data_processed/{patient_id}/*.pt"))
 
+        if len(files) < self.timepoints:
+            raise RuntimeError(f"Patient {patient_id} has only {len(files)} timepoints")
+
         data_list = []
         data_list_transforms = []
 
         for t in range(self.timepoints):
             data = torch.load(files[t])
-
 
             if self.output_2D:
                 # select middle slice in axial plane
@@ -203,13 +205,10 @@ class ISPY2(Dataset):
 
             if self.transforms:
                 data_transformed = self.transforms({"image": data.squeeze(0)})["image"]
-                data_transformed = data_transformed.unsqueeze(0)  # add batch dim back
-
-                # if self.output_2D:
-                    # data_transformed = data_transformed[:, :, :, :, data_transformed.shape[-1]//2]  # (C, D, H, W) -> (C, D, H)
-
-                # data_list_transforms.append(data_transformed)            
-                data_list_transforms.append(data)            
+                data_transformed = data_transformed.unsqueeze(0)  # add batch dim back            
+                data_list_transforms.append(data_transformed)       
+            else:
+                data_list_transforms.append(data)  # no augmentation, just keep original     
         
         data = torch.cat(data_list+data_list_transforms, dim=0)  # (T, C, D, H, W)
 

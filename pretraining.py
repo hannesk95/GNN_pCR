@@ -35,7 +35,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score, matthews_corrcoef, confusion_matrix, roc_auc_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from utils.utils import set_deterministic, log_all_python_files
+from utils.utils import set_deterministic, log_all_python_files, seed_worker
 
 BATCH_SIZE = 16
 ACCUMULATION_STEPS = 4
@@ -90,9 +90,12 @@ def main(method, timepoints, fold):
         replacement=True
     )
 
-    train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, sampler=sampler)
-    val_dl = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
-    test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
+    g = torch.Generator()
+    g.manual_seed(42)
+
+    train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, sampler=sampler, persistent_workers=True, worker_init_fn=seed_worker, generator=g)
+    val_dl = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, persistent_workers=True, worker_init_fn=seed_worker, generator=g)
+    test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, persistent_workers=True, worker_init_fn=seed_worker, generator=g)
 
     if method == "kaczmarek":
         model = ResNet18EncoderKaczmarek(timepoints=timepoints).to(device)
