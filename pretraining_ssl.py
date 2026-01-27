@@ -11,8 +11,14 @@ def parse_args():
         default=0,
         help="GPU index to use (e.g. 0 or 1)",
     )
+    parser.add_argument(
+        "--skip_loss",
+        type=str,
+        default=None,
+        choices=["alignment_loss", "temporal_loss", "orthogonality_loss", None],
+        help="Specify which loss to skip: alignment_loss, temporal_loss, orthogonality_loss, or None",
+    )
     return parser.parse_args()
-
 
 args = parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
@@ -340,23 +346,18 @@ def main(method, timepoints, fold, skip_loss):
     os.remove('model_best_loss.pt')  
     os.remove('model_latest_epoch.pt')
 
-if __name__ == '__main__':   
-
-    skip_loss = None
-    # skip_loss = "alignment_loss"
-    # skip_loss = "orthogonality_loss"
-    # skip_loss = "temporal_loss"
+if __name__ == '__main__':
     
     # for method in ["kiechle", "kaczmarek", "janickova"]:
     for method in ["kiechle"]:
         for timepoints in [4]:
             for fold in range(5):
 
-                if skip_loss:
-                    mlflow.set_experiment(f"self-supervised-pretraining_wo_{skip_loss}")
+                if args.skip_loss:
+                    mlflow.set_experiment(f"self-supervised-pretraining_wo_{args.skip_loss}")
                 else:
                     mlflow.set_experiment(f"self-supervised-pretraining")
 
                 mlflow.end_run()  # end previous run if any
                 with mlflow.start_run():
-                    main(method, timepoints, fold, skip_loss)
+                    main(method, timepoints, fold, args.skip_loss)
