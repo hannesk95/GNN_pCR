@@ -15,7 +15,6 @@ def parse_args():
         "--skip_loss",
         type=str,
         default=None,
-        choices=["alignment_loss", "temporal_loss", "orthogonality_loss", None],
         help="Specify which loss to skip: alignment_loss, temporal_loss, orthogonality_loss, or None",
     )
     return parser.parse_args()
@@ -354,6 +353,7 @@ if __name__ == '__main__':
             for fold in range(5):
 
                 if args.skip_loss:
+                    print(f"Starting experiment with skipping {args.skip_loss}...")
                     mlflow.set_experiment(f"self-supervised-pretraining_wo_{args.skip_loss}")
                 else:
                     mlflow.set_experiment(f"self-supervised-pretraining")
