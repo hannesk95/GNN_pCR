@@ -2,7 +2,7 @@ import torch
 from tqdm import tqdm
 import numpy as np
 import os
-from data.Dataloader import get_train_dataloaders, get_val_dataloaders, get_test_dataloaders
+# from data.Dataloader import get_train_dataloaders, get_val_dataloaders, get_test_dataloaders
 import argparse
 import yaml
 # from utils.pretraining_engine import train_epoch, eval_epoch
@@ -10,15 +10,15 @@ from models.builder import build_model
 # from models.GNN import TemporalGNN
 import os
 import random
-from sklearn.linear_model import LogisticRegression
+# from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 import torch.nn as nn
 import numpy as np
-import matplotlib.pyplot as plt
-import umap
+# import matplotlib.pyplot as plt
+# import umap
 from sklearn.preprocessing import StandardScaler
 import mlflow
-from omegaconf import OmegaConf
+# from omegaconf import OmegaConf
 from utils.graph_utils import make_directed_complete_forward_graph
 # from models.Janickova import ResNet18Encoder
 from data.Dataset import ISPY2
@@ -28,7 +28,7 @@ from numpy import mean
 from numpy import std
 from sklearn.model_selection import StratifiedKFold, KFold
 from sklearn.model_selection import GridSearchCV
-from sklearn.ensemble import RandomForestClassifier
+# from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import balanced_accuracy_score, f1_score, matthews_corrcoef, roc_auc_score
 from glob import glob
 import torch
@@ -36,15 +36,15 @@ import numpy as np
 from sklearn.decomposition import PCA
 from imblearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from imblearn.over_sampling import SMOTE
+# from imblearn.over_sampling import SMOTE
 from sklearn.svm import SVC
 import mlflow
-import seaborn as sns
-import matplotlib.pyplot as plt
+# import seaborn as sns
+# import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 import os
 import itertools
-from models.DINOv3 import DINOv3
+# from models.DINOv3 import DINOv3
 from models.Kaczmarek import ResNet18EncoderKaczmarek
 from utils.utils import set_deterministic, log_all_python_files, seed_worker
 from utils.pretraining_engine import inference_janickova
@@ -67,8 +67,22 @@ from sklearn.metrics import (
     confusion_matrix
 )
 
-from imblearn.pipeline import Pipeline
-from imblearn.over_sampling import SMOTE
+# from imblearn.pipeline import Pipeline
+# from imblearn.over_sampling import SMOTE
+import numpy as np
+
+from sklearn.svm import SVC
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    matthews_corrcoef,
+    roc_auc_score,
+    confusion_matrix
+)
 
 def main(method, timepoints, fold, checkpoint_path):
     
