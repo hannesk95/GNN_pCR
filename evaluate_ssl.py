@@ -1,88 +1,32 @@
-import torch
-from tqdm import tqdm
-import numpy as np
-import os
-# from data.Dataloader import get_train_dataloaders, get_val_dataloaders, get_test_dataloaders
-import argparse
-import yaml
-# from utils.pretraining_engine import train_epoch, eval_epoch
-from models.builder import build_model
-# from models.GNN import TemporalGNN
-import os
-import random
-# from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import balanced_accuracy_score, roc_auc_score
-import torch.nn as nn
-import numpy as np
-# import matplotlib.pyplot as plt
-# import umap
-from sklearn.preprocessing import StandardScaler
 import mlflow
-# from omegaconf import OmegaConf
-from utils.graph_utils import make_directed_complete_forward_graph
-# from models.Janickova import ResNet18Encoder
-from data.Dataset import ISPY2
-from sklearn.decomposition import PCA
-# from imblearn.pipeline import Pipeline
-from numpy import mean
-from numpy import std
-from sklearn.model_selection import StratifiedKFold, KFold
-from sklearn.model_selection import GridSearchCV
-# from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import balanced_accuracy_score, f1_score, matthews_corrcoef, roc_auc_score
-from glob import glob
-import torch
 import numpy as np
+import torch
+
 from sklearn.decomposition import PCA
-# from imblearn.pipeline import Pipeline
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    confusion_matrix,
+    matthews_corrcoef,
+    roc_auc_score,
+)
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-# from imblearn.over_sampling import SMOTE
 from sklearn.svm import SVC
-import mlflow
-# import seaborn as sns
-# import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix
-import os
-import itertools
-# from models.DINOv3 import DINOv3
-from models.Kaczmarek import ResNet18EncoderKaczmarek
-from utils.utils import set_deterministic, log_all_python_files, seed_worker
-from utils.pretraining_engine import inference_janickova
-from utils.pretraining_engine import inference_kaczmarek
-from utils.pretraining_engine import inference_kiechle
-from models.Kiechle import ResNet18EncoderKiechle
+
+from data.Dataset import ISPY2
+
 from models.Janickova import ResNet18EncoderJanickova
 from models.Kaczmarek import ResNet18EncoderKaczmarek
-from sklearn.preprocessing import OneHotEncoder
-import numpy as np
+from models.Kiechle import ResNet18EncoderKiechle
 
-from sklearn.svm import SVC
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
-from sklearn.metrics import (
-    balanced_accuracy_score,
-    matthews_corrcoef,
-    roc_auc_score,
-    confusion_matrix
+from utils.pretraining_engine import (
+    inference_janickova,
+    inference_kaczmarek,
+    inference_kiechle,
 )
+from utils.utils import log_all_python_files, set_deterministic
 
-# from imblearn.pipeline import Pipeline
-# from imblearn.over_sampling import SMOTE
-import numpy as np
-
-from sklearn.svm import SVC
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
-from sklearn.metrics import (
-    balanced_accuracy_score,
-    matthews_corrcoef,
-    roc_auc_score,
-    confusion_matrix
-)
 
 def main(method, timepoints, fold, checkpoint_path):
     

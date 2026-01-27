@@ -1,5 +1,6 @@
 import argparse
 import os
+from glob import glob
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -7,33 +8,32 @@ def parse_args():
         "--gpu",
         type=int,
         default=0,
-        help="GPU index to use (e.g. 0 or 1)"
+        help="GPU index to use (e.g. 0 or 1)",
     )
     return parser.parse_args()
+
 
 args = parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
-import os
-import torch
 import mlflow
-import random
 import numpy as np
-from monai.utils import set_determinism
-from tqdm import tqdm 
-from glob import glob
-from pathlib import Path
+import torch
+from tqdm import tqdm
+from torch.amp import GradScaler
+
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    confusion_matrix,
+    matthews_corrcoef,
+    roc_auc_score,
+)
 
 from data.Dataset import ISPY2
-from torch.utils.data import DataLoader
-from models.CNN_LSTM import CNNLSTM
-from models.CNN_distLSTM import CNNdistLSTM
 from models.CNN import CNN
-from torch.amp import autocast, GradScaler
-from scipy.special import softmax
+from models.CNN_distLSTM import CNNdistLSTM
+from utils.utils import log_all_python_files, seed_worker, set_deterministic
 
-from sklearn.metrics import balanced_accuracy_score, roc_auc_score, matthews_corrcoef, confusion_matrix
-from utils.utils import set_deterministic, log_all_python_files, seed_worker
 
 BATCH_SIZE = 16
 ACCUMULATION_STEPS = 4

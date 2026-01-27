@@ -1,5 +1,7 @@
 import argparse
 import os
+import itertools
+from glob import glob
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -7,35 +9,49 @@ def parse_args():
         "--gpu",
         type=int,
         default=0,
-        help="GPU index to use (e.g. 0 or 1)"
+        help="GPU index to use (e.g. 0 or 1)",
     )
     return parser.parse_args()
+
 
 args = parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
-import torch
 import mlflow
-import itertools
 import numpy as np
-
+import torch
 from tqdm import tqdm
-from glob import glob
-from utils.pretraining_engine import train_epoch_janickova, eval_epoch_janickova, inference_janickova
-from utils.pretraining_engine import train_epoch_kaczmarek, eval_epoch_kaczmarek, inference_kaczmarek
-from utils.pretraining_engine import train_epoch_kiechle, eval_epoch_kiechle, inference_kiechle
-from models.Kiechle import ResNet18EncoderKiechle
+from torch.amp import GradScaler
+
+from sklearn.decomposition import PCA
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    confusion_matrix,
+    matthews_corrcoef,
+    roc_auc_score,
+)
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.svm import SVC
+
+from data.Dataset import ISPY2
+
 from models.Janickova import ResNet18EncoderJanickova
 from models.Kaczmarek import ResNet18EncoderKaczmarek
-from data.Dataset import ISPY2
-from torch.amp import GradScaler
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import balanced_accuracy_score, matthews_corrcoef, confusion_matrix, roc_auc_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from utils.utils import set_deterministic, log_all_python_files, seed_worker
+from models.Kiechle import ResNet18EncoderKiechle
+
+from utils.pretraining_engine import (
+    train_epoch_janickova,
+    train_epoch_kaczmarek,
+    train_epoch_kiechle,
+    eval_epoch_janickova,
+    eval_epoch_kaczmarek,
+    eval_epoch_kiechle,
+    inference_janickova,
+    inference_kaczmarek,
+    inference_kiechle,    
+)
+from utils.utils import log_all_python_files, seed_worker, set_deterministic
+
 
 BATCH_SIZE = 16
 ACCUMULATION_STEPS = 4
