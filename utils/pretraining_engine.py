@@ -534,6 +534,7 @@ def train_epoch_kiechle(
         epoch = None,
         accumulation_steps = None,
         lr_scheduler = None,
+        skip_loss = None
 ):
     """
     Train the GNN model for one epoch.
@@ -552,7 +553,7 @@ def train_epoch_kiechle(
     """
     model.train()
 
-    loss_fn = AsymmetricContrastiveLoss(margin=0.0, lambda_neg=1.0, timepoints=timepoints).to(device)
+    loss_fn = AsymmetricContrastiveLoss(margin=0.0, lambda_neg=1.0, timepoints=timepoints, skip_loss=skip_loss).to(device)
 
     # Lists to track different losses for the epoch
     loss_align_epoch = []
@@ -616,6 +617,7 @@ def eval_epoch_kiechle(
         device: torch.device = 'cuda',
         epoch = None,
         accumulation_steps = None,
+        skip_loss = None
 ):
     """
     Evaluate the GNN model for one epoch.

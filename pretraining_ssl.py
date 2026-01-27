@@ -58,7 +58,7 @@ ACCUMULATION_STEPS = 4
 EPOCHS = 100
 ALIGN_LABELS = [1.0]
 
-def main(method, timepoints, fold):
+def main(method, timepoints, fold, skip_loss):
     
     set_deterministic()   
     log_all_python_files()
@@ -68,6 +68,7 @@ def main(method, timepoints, fold):
     mlflow.log_param('method', method)    
     mlflow.log_param('timepoints', timepoints)
     mlflow.log_param('fold', fold)   
+    mlflow.log_param('skip_loss', skip_loss)
        
     mlflow.log_param('batch_size', BATCH_SIZE)
     mlflow.log_param('accumulation_steps', ACCUMULATION_STEPS)
@@ -185,7 +186,8 @@ def main(method, timepoints, fold):
                     scaler=scaler,                
                     epoch=epoch, 
                     accumulation_steps=ACCUMULATION_STEPS,
-                    lr_scheduler=lr_scheduler
+                    lr_scheduler=lr_scheduler,
+                    skip_loss=skip_loss
             )
 
             val_losses, val_metrics = eval_epoch_kiechle(
@@ -194,7 +196,8 @@ def main(method, timepoints, fold):
                 timepoints=timepoints,
                 device=device,           
                 epoch=epoch,
-                accumulation_steps=ACCUMULATION_STEPS
+                accumulation_steps=ACCUMULATION_STEPS,
+                skip_loss=skip_loss
             )
 
             mlflow.log_metric('train_total_loss', train_losses['total'], step=epoch)            
@@ -338,13 +341,22 @@ def main(method, timepoints, fold):
     os.remove('model_latest_epoch.pt')
 
 if __name__ == '__main__':   
+
+    skip_loss = None
+    # skip_loss = "alignment_loss"
+    # skip_loss = "orthogonality_loss"
+    # skip_loss = "temporal_loss"
     
-    for method in ["kiechle", "kaczmarek", "janickova"]:
+    # for method in ["kiechle", "kaczmarek", "janickova"]:
+    for method in ["kiechle"]:
         for timepoints in [4]:
             for fold in range(5):
 
-                mlflow.set_experiment("self-supervised-pretraining")
+                if skip_loss:
+                    mlflow.set_experiment(f"self-supervised-pretraining_wo_{skip_loss}")
+                else:
+                    mlflow.set_experiment(f"self-supervised-pretraining")
 
                 mlflow.end_run()  # end previous run if any
                 with mlflow.start_run():
-                    main(method, timepoints, fold)
+                    main(method, timepoints, fold, skip_loss)

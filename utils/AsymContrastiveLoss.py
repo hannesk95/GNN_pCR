@@ -11,12 +11,13 @@ class AsymmetricContrastiveLoss(nn.Module):
     - Ignores non-responder ↔ non-responder relations
     """
 
-    def __init__(self, margin=0.2, lambda_neg=1.0, timepoints=None):
+    def __init__(self, margin=0.2, lambda_neg=1.0, timepoints=None, skip_loss=None):
         super().__init__()
         self.margin = margin
         self.lambda_neg = lambda_neg
         self.timepoints = timepoints
-
+        self.skip_loss = skip_loss
+    
     def forward(self, z, labels):
         """
         Args:
@@ -47,6 +48,9 @@ class AsymmetricContrastiveLoss(nn.Module):
             z_positive_permuted = z_positive[perm_latents_1]
             loss_align_positive = 1.0 - nn.functional.cosine_similarity(z_positive, z_positive_permuted, dim=-1).mean()
 
+            if self.skip_loss == "alignment_loss":
+                loss_align_positive = z.sum() * 0.0
+
             # B = pos_sim.size(0)
             # mask = torch.eye(B, dtype=torch.bool, device=pos_sim.device)
             # pos_sim = pos_sim.masked_fill(mask, float('-inf'))
@@ -71,6 +75,9 @@ class AsymmetricContrastiveLoss(nn.Module):
 
             loss_orthogonal = torch.stack(ortho_loss_list).mean()            
             
+            if self.skip_loss == "orthogonality_loss":
+                loss_orthogonal = z.sum() * 0.0
+            
             temporal_loss_list = []
             for i in range(z[labels].shape[0]):
                 z_0 = z[labels][i][:timepoint_dim]
@@ -93,7 +100,10 @@ class AsymmetricContrastiveLoss(nn.Module):
                 loss_temporal = (l1 + l2 + l3) / 3.0
                 temporal_loss_list.append(loss_temporal)                
                 
-            loss_temporal = torch.stack(temporal_loss_list).mean()            
+            loss_temporal = torch.stack(temporal_loss_list).mean()   
+
+            if self.skip_loss == "temporal_loss":
+                loss_temporal = z.sum() * 0.0         
             
         else:            
             loss_align_positive = z.sum() * 0.0
@@ -126,6 +136,9 @@ class AsymmetricContrastiveLoss(nn.Module):
                 pass # equal sizes            
 
             loss_align_negative = nn.functional.cosine_similarity(z_pos, z_neg, dim=-1).mean()
+
+            if self.skip_loss == "alignment_loss":
+                loss_align_negative = z.sum() * 0.0
 
         else:            
             loss_align_negative = z.sum() * 0.0
