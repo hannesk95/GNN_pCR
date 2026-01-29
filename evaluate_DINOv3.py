@@ -12,6 +12,8 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.pipeline import Pipeline
 
 from data.Dataset import ISPY2
 from models.DINOv3 import DINOv3
@@ -111,50 +113,113 @@ def main(method, timepoints, fold):
     X_val, y_val = val_latents, val_labels
     X_test, y_test = test_latents, test_labels
 
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_val = scaler.transform(X_val)
-    X_test = scaler.transform(X_test)    
+    # sklearn
 
-    pca = PCA(n_components=0.95)
-    X_train = pca.fit_transform(X_train)
-    X_val = pca.transform(X_val)
-    X_test = pca.transform(X_test) 
+    X_trainval = np.vstack([X_train, X_val])
+    y_trainval = np.hstack([y_train, y_val])
 
-    clf = SVC(probability=True)
-    # clf = LogisticRegression(max_iter=1000)
-    clf.fit(X_train, y_train)
+    pipeline = Pipeline(steps=[
+        ("scaler", StandardScaler()),
+        ("pca", PCA()),
+        ("svm", SVC(
+            kernel="rbf",
+            class_weight="balanced",
+            probability=True,
+            random_state=42
+        ))
+    ])
 
-    train_preds = clf.predict(X_train)
-    train_probs = clf.predict_proba(X_train)[:,1]
-    test_preds = clf.predict(X_test)
-    test_probs = clf.predict_proba(X_test)[:,1]
+    param_grid = {
+        "pca__n_components": [0.90, 0.95, 0.99],
+        "svm__C": [0.1, 1, 10, 100],
+        "svm__gamma": ["scale", 0.01, 0.001]
+    }
 
-    train_bacc = balanced_accuracy_score(y_train, train_preds)
-    train_mcc = matthews_corrcoef(y_train, train_preds)
-    train_cm = confusion_matrix(y_train, train_preds)   
-    train_sensitivity = train_cm[1,1] / (train_cm[1,0] + train_cm[1,1])
-    train_specificity = train_cm[0,0] / (train_cm[0,0] + train_cm[0,1])
-    train_roc_auc = roc_auc_score(y_train, train_probs)
-    
-    test_bacc = balanced_accuracy_score(y_test, test_preds)
-    test_mcc = matthews_corrcoef(y_test, test_preds)
-    test_cm = confusion_matrix(y_test, test_preds)   
-    test_sensitivity = test_cm[1,1] / (test_cm[1,0] + test_cm[1,1])
-    test_specificity = test_cm[0,0] / (test_cm[0,0] + test_cm[0,1])
-    test_roc_auc = roc_auc_score(y_test, test_probs)
-    
-    mlflow.log_param(f'train_bacc', train_bacc)
-    mlflow.log_param(f'train_mcc', train_mcc)
-    mlflow.log_param(f'train_roc_auc', train_roc_auc)
-    mlflow.log_param(f'train_sensitivity', train_sensitivity)
-    mlflow.log_param(f'train_specificity', train_specificity)
-    
-    mlflow.log_param(f'test_bacc', test_bacc)
-    mlflow.log_param(f'test_mcc', test_mcc)
-    mlflow.log_param(f'test_roc_auc', test_roc_auc)    
-    mlflow.log_param(f'test_sensitivity', test_sensitivity)
-    mlflow.log_param(f'test_specificity', test_specificity)
+    inner_cv = StratifiedKFold(
+        n_splits=5,
+        shuffle=True,
+        random_state=42
+    )
+
+    outer_cv = StratifiedKFold(
+        n_splits=5,
+        shuffle=True,
+        random_state=42
+    )
+
+    outer_scores = []
+
+    for fold, (train_idx, val_idx) in enumerate(
+        outer_cv.split(X_trainval, y_trainval), 1
+    ):
+        X_tr, X_va = X_trainval[train_idx], X_trainval[val_idx]
+        y_tr, y_va = y_trainval[train_idx], y_trainval[val_idx]
+
+        grid = GridSearchCV(
+            estimator=pipeline,
+            param_grid=param_grid,
+            scoring="balanced_accuracy",
+            cv=inner_cv,
+            n_jobs=-1
+        )
+
+        grid.fit(X_tr, y_tr)
+
+        best_model = grid.best_estimator_
+        y_pred = best_model.predict(X_va)
+
+        score = balanced_accuracy_score(y_va, y_pred)
+        outer_scores.append(score)
+
+        print(f"Outer fold {fold} | Balanced Acc: {score:.3f}")
+
+    print(
+        f"\nNested CV Balanced Accuracy: "
+        f"{np.mean(outer_scores):.3f} ± {np.std(outer_scores):.3f}"
+    )
+
+    final_grid = GridSearchCV(
+        estimator=pipeline,
+        param_grid=param_grid,
+        scoring="balanced_accuracy",
+        cv=inner_cv,
+        n_jobs=-1
+    )
+
+    final_grid.fit(X_trainval, y_trainval)
+    final_model = final_grid.best_estimator_
+
+    print("Best parameters:", final_grid.best_params_)
+
+    y_test_pred = final_model.predict(X_test)
+    y_test_prob = final_model.predict_proba(X_test)[:, 1]
+
+    # Balanced Accuracy
+    bal_acc = balanced_accuracy_score(y_test, y_test_pred)
+
+    # MCC
+    mcc = matthews_corrcoef(y_test, y_test_pred)
+
+    # AUROC
+    auroc = roc_auc_score(y_test, y_test_prob)
+
+    # Sensitivity / Specificity
+    tn, fp, fn, tp = confusion_matrix(y_test, y_test_pred).ravel()
+    sensitivity = tp / (tp + fn)
+    specificity = tn / (tn + fp)
+
+    print("\nTest set performance")
+    print(f"Balanced Accuracy : {bal_acc:.3f}")
+    print(f"MCC               : {mcc:.3f}")
+    print(f"AUROC             : {auroc:.3f}")
+    print(f"Sensitivity       : {sensitivity:.3f}")
+    print(f"Specificity       : {specificity:.3f}")
+
+    mlflow.log_metric('test_balanced_accuracy', bal_acc)
+    mlflow.log_metric('test_mcc', mcc)
+    mlflow.log_metric('test_auroc', auroc)
+    mlflow.log_metric('test_sensitivity', sensitivity)
+    mlflow.log_metric('test_specificity', specificity)
 
 
 if __name__ == '__main__':     
@@ -162,7 +227,7 @@ if __name__ == '__main__':
     set_deterministic()
 
     for method in ['DINOv3']:
-        for timepoints in [4]:            
+        for timepoints in [1, 2, 3, 4]:            
             for fold in range(5):
         
                 mlflow.set_experiment("DINOv3")
