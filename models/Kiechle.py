@@ -137,18 +137,40 @@ class TemporalGNN(torch.nn.Module):
         x = self.conv2(x, edge_index)
         
         return x
+
+class TemporalMLP(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers):
+        super(TemporalMLP, self).__init__()
+
+        self.linear1 = torch.nn.Linear(in_channels, out_channels)        
+        self.linear2 = torch.nn.Linear(out_channels, out_channels)
+        self.relu = torch.nn.ReLU()
+        self.bn = nn.BatchNorm1d(out_channels)
+
+    def forward(self, x):
+        x = self.linear1(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        x = self.linear2(x)
+
+        return x
     
 class ResNet18EncoderKiechle(torch.nn.Module):
-    def __init__(self, timepoints):
+    def __init__(self, timepoints, use_gnn=True):
         super(ResNet18EncoderKiechle, self).__init__()
         
+        self.use_gnn = use_gnn
         self.timepoints = timepoints
         model = monai.networks.nets.resnet18(spatial_dims=3, n_input_channels=3, num_classes=2)
         encoder_layers = list(model.children())[:-1]
         encoder_layers.append(torch.nn.Flatten(start_dim=1, end_dim=-1))                
         self.encoder = nn.Sequential(*encoder_layers)
 
-        self.gnn_projector = TemporalGNN(in_channels=512, hidden_channels=0, out_channels=128, num_layers=0, aggregation="mean")
+        if use_gnn:
+            self.gnn_projector = TemporalGNN(in_channels=512, hidden_channels=0, out_channels=128, num_layers=0, aggregation="mean")
+        else:
+            self.mlp_projector = TemporalMLP(in_channels=512, hidden_channels=0, out_channels=128, num_layers=0)
+        
 
     def forward(self, images):
         """
@@ -173,11 +195,17 @@ class ResNet18EncoderKiechle(torch.nn.Module):
         graph_data_transformed = graph_data_transformed.to(features.device)
         # graph_data_transformed = graph_data_transformed.sort(sort_by_row=False)
 
-        latents_original = self.gnn_projector(graph_data_original.x, graph_data_original.edge_index)  # (B*timepoints, 128)
+        if self.use_gnn:
+            latents_original = self.gnn_projector(graph_data_original.x, graph_data_original.edge_index)  # (B*timepoints, 128)
+        else:
+            latents_original = self.mlp_projector(graph_data_original.x)  # (B*timepoints, 128)
         latents_original = latents_original.view(B, -1, latents_original.size(-1))
         latents_original = latents_original.flatten(start_dim=1) 
         
-        latents_transformed = self.gnn_projector(graph_data_transformed.x, graph_data_transformed.edge_index)  # (B*timepoints, 128)
+        if self.use_gnn:
+            latents_transformed = self.gnn_projector(graph_data_transformed.x, graph_data_transformed.edge_index)  # (B*timepoints, 128)
+        else:
+            latents_transformed = self.mlp_projector(graph_data_transformed.x)  # (B*timepoints, 128)
         latents_transformed = latents_transformed.view(B, -1, latents_transformed.size(-1))
         latents_transformed = latents_transformed.flatten(start_dim=1) 
         
