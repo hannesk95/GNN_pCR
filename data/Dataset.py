@@ -118,7 +118,8 @@ class ISPY2(Dataset):
         self.split = split
         self.fold = fold
         self.timepoints = timepoints
-        self.patient_ids = torch.load(f"./data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold][split]        
+        # self.patient_ids = torch.load(f"./data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold][split]        
+        self.patient_ids = torch.load(f"./data/breast_cancer/data_splits_4_timepoints.pt")[fold][split]        
         self.transforms = None
         self.output_2D = output_2D
         self.output_time_dists = output_time_dists
