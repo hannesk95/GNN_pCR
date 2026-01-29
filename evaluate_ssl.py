@@ -215,11 +215,11 @@ if __name__ == '__main__':
     }
     
     kiechle_dict = {
-        "fold_0_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/a00da610e4ec4ba786ef63abbdac5ab7/artifacts/model_best_metric.pt",
-        "fold_1_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/c724a86d33284fc298283f32ff207a61/artifacts/model_best_metric.pt",
-        "fold_2_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/c724a86d33284fc298283f32ff207a61/artifacts/model_best_metric.pt",
-        "fold_3_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/ab7a282b007a44dcb8abfd041b2db7ac/artifacts/model_best_metric.pt",
-        "fold_4_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/90b66fc6c2d94dbea2e90681b54b218e/artifacts/model_best_metric.pt",
+        "fold_0_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/842766c839d046b4a11c33b099bb8889/artifacts/model_best_metric.pt",
+        "fold_1_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/be4dbfa23308407d8228de9d10e7a47e/artifacts/model_best_metric.pt",
+        "fold_2_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/289cc2ceb0de4c88a87627dbb55495ae/artifacts/model_best_metric.pt",
+        "fold_3_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/cfe81c53ee7547ec9eb4aff3381ee894/artifacts/model_best_metric.pt",
+        "fold_4_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/c5f3a343737c40299527ae686a73d576/artifacts/model_best_metric.pt",
     }
 
     checkpoints_dict = {
