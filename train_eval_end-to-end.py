@@ -101,9 +101,9 @@ def main(method, timepoints, fold):
 
     if method == "CNN_LSTM":
         # model = CNNLSTM().cuda()
-        model = CNNdistLSTM().cuda()
+        model = CNNdistLSTM(use_time_distances=False).cuda()
     elif method == "CNN_distLSTM":
-        model = CNNdistLSTM().cuda()
+        model = CNNdistLSTM(use_time_distances=True).cuda()
     elif method == "CNN":
         model = CNN(num_timepoints=timepoints).cuda()    
     else:
@@ -133,7 +133,8 @@ def main(method, timepoints, fold):
 
             with torch.amp.autocast("cuda"):
                 if method == "CNN_distLSTM":
-                    time_dists = batch_data[2].float().to(device)  # (B, T)
+                    time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                    time_dists = time_dists - torch.min(time_dists)
                     logits = model(images, time_dists)
                 else:
                     logits = model(images)
@@ -173,7 +174,8 @@ def main(method, timepoints, fold):
 
                 with torch.amp.autocast("cuda"):
                     if method == "CNN_distLSTM":
-                        time_dists = batch_data[2].float().to(device)  # (B, T)
+                        time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                        time_dists = time_dists - torch.min(time_dists)
                         logits = model(images, time_dists)
                     else:
                         logits = model(images)
@@ -259,7 +261,8 @@ def main(method, timepoints, fold):
 
             with torch.amp.autocast("cuda"):
                 if method == "CNN_distLSTM":
-                    time_dists = batch_data[2].float().to(device)  # (B, T)
+                    time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                    time_dists = time_dists - torch.min(time_dists)
                     logits = model(images, time_dists)
                 else:
                     logits = model(images)
@@ -297,12 +300,12 @@ def main(method, timepoints, fold):
 
 if __name__ == "__main__":    
 
-    for method in ["CNN", "CNN_LSTM", "CNN_distLSTM"]:
+    for method in ["CNN_distLSTM"]:
         for timepoints in [4]:
             for fold in range(5):
 
-                mlflow.set_experiment("end-to-end")
+                mlflow.set_experiment("supervised_baselines")                
 
                 mlflow.end_run()  # end previous run if any
-                with mlflow.start_run():
+                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
                     main(method, timepoints, fold)
