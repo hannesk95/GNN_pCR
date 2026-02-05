@@ -3,6 +3,8 @@ mlruns/
 conda_env/
 _delete/
 .vscode/
+save_folder/
+dist_conv_lstm/
 
 # files
 *.pyc
