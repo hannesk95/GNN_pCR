@@ -3,6 +3,16 @@ import monai
 import torch.nn as nn
 from torchsummary import summary
 
+# -------------------------
+# Weight initialization
+# -------------------------
+def init_weights(m):
+    if isinstance(m, (nn.Conv3d, nn.Linear)):
+        nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+
+
 class CNN(nn.Module):
     def __init__(self, num_timepoints = None):
         super().__init__()
@@ -15,8 +25,6 @@ class CNN(nn.Module):
         encoder_layers.append(torch.nn.Flatten(start_dim=1, end_dim=-1))                
         self.encoder = torch.nn.Sequential(*encoder_layers)   
 
-        self.dropout = nn.Dropout(p=0.5)
-
         # Fully connected classifier
         self.classifier = nn.Sequential(
             nn.Linear(512 * num_timepoints, 256),
@@ -26,17 +34,7 @@ class CNN(nn.Module):
             nn.Linear(64, 2),
         )
 
-        self.encoder.apply(self.init_weights)
-        self.classifier.apply(self.init_weights)
-
-    def init_weights(self, m):
-        if isinstance(m, torch.nn.Conv3d):
-            torch.nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
-            if m.bias is not None:
-                torch.nn.init.zeros_(m.bias)
-        elif isinstance(m, torch.nn.Linear):
-            torch.nn.init.xavier_uniform_(m.weight)
-            torch.nn.init.zeros_(m.bias)
+        self.apply(init_weights)
 
     def forward(self, images):
         """
@@ -48,10 +46,7 @@ class CNN(nn.Module):
         images = images.view(B * T, C, D, H, W)
         features = self.encoder(images)  # (B*T, 512)
         features = features.view(B, T, -1)  # (B, T, 512)
-        features = features.view(B, T*features.size(2))  # (B, T*512)
-
-        # apply dropout
-        features = self.dropout(features)
+        features = features.view(B, -1)  # (B, T*512)
 
         logits = self.classifier(features)
 
