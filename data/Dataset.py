@@ -18,7 +18,7 @@ from monai.transforms import (
 import numpy as np
 import itertools
 from datetime import datetime
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 class SplitMRIAndMask(MapTransform):
     def __init__(self, keys):
@@ -142,7 +142,8 @@ class ISPY2(Dataset):
                 days_since_ref = days_since_ref[:self.timepoints]
                 time_diffs.extend(days_since_ref)
             time_diffs = np.array(time_diffs, dtype=np.float32).reshape(-1, 1)  # (N*T, 1)
-            self.scaler = StandardScaler()
+            # self.scaler = StandardScaler()
+            self.scaler = MinMaxScaler()
             self.scaler.fit(time_diffs)
         
         if split in ["train"]:
