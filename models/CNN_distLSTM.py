@@ -4,6 +4,15 @@ import torch.nn as nn
 from torchsummary import summary
 # from distanceLSTM.distanceLSTM import distLSTM
 
+# import sys
+# sys.path.append("/home/johannes/Data/SSD_2.0TB/GNN_pCR/dist_conv_lstm/tumor-cifar")
+# import crnn
+
+import sys
+sys.path.append("/home/johannes/Data/SSD_2.0TB/GNN_pCR/models")
+from tLSTM import LSTMFromScratch
+
+
 class distLSTMCell(nn.Module):
     """
     Minimal, explicit LSTM cell.
@@ -124,7 +133,7 @@ class distLSTM(nn.Module):
         return torch.stack(outputs, dim=1)  # (B, T, hidden_dim)
 
 class CNNdistLSTM(nn.Module):
-    def __init__(self):
+    def __init__(self, use_time_distances=False):
         super().__init__()
 
         # Image encoder
@@ -132,6 +141,8 @@ class CNNdistLSTM(nn.Module):
         encoder_layers = list(model.children())[:-1]
         encoder_layers.append(torch.nn.Flatten(start_dim=1, end_dim=-1))                
         self.encoder = torch.nn.Sequential(*encoder_layers)
+
+        self.use_time_distances = use_time_distances
 
         # LSTM over time
         # self.lstm = nn.LSTM(
@@ -141,7 +152,14 @@ class CNNdistLSTM(nn.Module):
         #     batch_first=True,
         #     bidirectional=False,
         # )
-        self.lstm = distLSTM(input_dim=512, hidden_dim=256)
+        # self.lstm = distLSTM(input_dim=512, hidden_dim=256)
+
+        # in_channels = 1
+        # out_channels = 256
+        # kernel_size = 3
+        # self.dislstmcell = crnn.LSTMdistCell('infor_exp', in_channels, out_channels, kernel_size, convndim = 1)
+
+        self.lstm = LSTMFromScratch(input_size=512, hidden_size=256, use_time_distances=use_time_distances)
 
         # Fully connected classifier
         self.classifier = nn.Sequential(
@@ -152,12 +170,15 @@ class CNNdistLSTM(nn.Module):
             nn.Linear(64, 2),
         )
 
-        self.dropout = nn.Dropout(p=0.5)
+        # self.dropout = nn.Dropout(p=0.5)
 
     def forward(self, images, time_dists=None):
         """
         images:   (B, T, 3, D, H, W)
         """
+
+        if self.use_time_distances and time_dists is None:
+            raise ValueError("Time distances must be provided when use_time_distances is True")
 
         B, T, C, D, H, W = images.shape
    
@@ -165,11 +186,33 @@ class CNNdistLSTM(nn.Module):
         features = self.encoder(images)  # (B*T, 512)
         features = features.view(B, T, -1)  # (B, T, 512)
 
-        # apply dropout
-        features = self.dropout(features)
+        if self.use_time_distances:
+            out, _ = self.lstm(x=features, time_distances=time_dists)
+        else:
+            out, _ = self.lstm(x=features)        
 
-        out = self.lstm(features, time_dists)
-        out = out[:, -1, :]  # (B, 256)        
+        out = out[:, -1, :]  # (B, 256)
+
+        # time_dists = torch.zeros(B, T).to(features.device)  # dummy time distances for testing
+        # features = features.unsqueeze(2)  # (B, T, 1, 512) - add channel dimension for conv LSTM        
+        # x = features.permute(1, 0, 2, 3) # change to (T, B, C, F) for conv LSTM cell
+
+        # # apply dropout
+        # # features = self.dropout(features)
+
+        # # out = self.lstm(features, time_dists)
+        # # out = out[:, -1, :]  # (B, 256)        
+
+        # # Using distance LSTM cell from crnn
+        # for i in range(T):
+            
+        #     if i == 0:
+        #         hx, cx = self.dislstmcell(x[i], [time_dists[:,0], time_dists[:, 0]])
+        #     else:
+        #         hx, cx = self.dislstmcell(x[i], [time_dists[:,i-1], time_dists[:,i]], (hx, cx))
+
+        # # max pooling last dimension to get (B, 256)
+        # out = torch.max(hx, dim=-1)[0]
 
         logits = self.classifier(out)
 
