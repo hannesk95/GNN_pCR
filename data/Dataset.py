@@ -48,7 +48,7 @@ class ISPY2(Dataset):
 
         if output_time_dists:
 
-            train_patient_ids = torch.load(f"./data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold]['train']
+            train_patient_ids = torch.load(f"./data/breast_cancer/data_splits_4_timepoints.pt")[fold]['train']
             
             time_diffs = []
             for patient_id in train_patient_ids:
