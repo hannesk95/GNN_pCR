@@ -43,10 +43,6 @@ class CNN(nn.Module):
         features = features.reshape(B, T, -1)       # (B, T, 512)
         features = features.reshape(B, -1)          # (B, T*512)
 
-        if T < 4:
-            padding = torch.zeros(B, (4 - T) * 512).to(features.device)
-            features = torch.cat((features, padding), dim=1)
-
         logits = self.classifier(features)
 
         return logits

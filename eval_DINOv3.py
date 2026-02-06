@@ -227,7 +227,7 @@ if __name__ == '__main__':
     set_deterministic()
 
     for method in ['DINOv3']:
-        for timepoints in [1, 2, 3, 4]:            
+        for timepoints in [3, 4]:            
             for fold in range(5):
         
                 mlflow.set_tracking_uri("file:./mlruns")

@@ -2,7 +2,7 @@ import torch
 import monai
 import torch.nn as nn
 from torchsummary import summary
-from .distance_LSTM import LSTMFromScratch
+from distance_LSTM import LSTMFromScratch
 
 
 class CNNdistLSTM(nn.Module):
@@ -52,7 +52,8 @@ class CNNdistLSTM(nn.Module):
         if self.use_time_distances:
             out, _ = self.lstm(x=features, time_distances=time_dists)
         else:
-            out, _ = self.lstm(x=features)        
+            raise NotImplementedError("Currently, the model is only implemented to use time distances. Please set use_time_distances=True when initializing the model.")
+            # out, _ = self.lstm(x=features)        
 
         out = out[:, -1, :]  # (B, 256)
 
@@ -73,6 +74,6 @@ if __name__ == "__main__":
     out = model(images, time_dists) # with time distances
     print(out.shape)  
 
-    model = CNNdistLSTM(use_time_distances=False).cuda()
-    out = model(images)  # without time distances
-    print(out.shape)
+    # model = CNNdistLSTM(use_time_distances=False).cuda()
+    # out = model(images)  # without time distances
+    # print(out.shape)

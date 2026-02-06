@@ -35,7 +35,6 @@ from models.supervised.CNN_LSTM import CNNLSTM
 from models.supervised.CNN_distance_LSTM import CNNdistLSTM
 from utils.utils import log_all_python_files, seed_worker, set_deterministic
 
-
 BATCH_SIZE = 16
 ACCUMULATION_STEPS = 4
 EPOCHS = 100
@@ -105,7 +104,7 @@ def main(method, timepoints, fold):
     elif method == "CNN_LSTM":
         model = CNNLSTM().cuda()
     elif method == "CNN_distLSTM":
-        model = CNNdistLSTM(use_time_distances=True).cuda()       
+        model = CNNdistLSTM().cuda()       
     else:
         raise ValueError(f"Unknown method: {method}")
     
