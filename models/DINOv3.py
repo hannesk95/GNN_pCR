@@ -8,9 +8,9 @@ class DINOv3(torch.nn.Module):
         self.model = AutoModel.from_pretrained(model_name).to('cuda')
 
     def forward(self, images):
+        
         # Preprocess the images
         inputs = self.image_processor(images=images, return_tensors="pt").to('cuda')
-        # inputs = inputs.cuda()
         
         # Forward pass through the model
         outputs = self.model(**inputs)
