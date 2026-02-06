@@ -300,7 +300,7 @@ def main(method, timepoints, fold):
 
 if __name__ == "__main__":    
 
-    for method in ["CNN_distLSTM"]:
+    for method in ["CNN", "CNN_LSTM", "CNN_distLSTM"]:
         for timepoints in [4]:
             for fold in range(5):
 

@@ -12,15 +12,6 @@ import sys
 sys.path.append("/home/johannes/Data/SSD_2.0TB/GNN_pCR/models")
 from tLSTM import LSTMFromScratch
 
-# -------------------------
-# Weight initialization
-# -------------------------
-def init_weights(m):
-    if isinstance(m, (nn.Conv3d, nn.Linear)):
-        nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
-        if m.bias is not None:
-            nn.init.zeros_(m.bias)
-
 # class distLSTMCell(nn.Module):
 #     """
 #     Minimal, explicit LSTM cell.
@@ -163,7 +154,12 @@ class CNNdistLSTM(nn.Module):
             nn.Linear(64, 2),
         )
 
-        self.apply(init_weights)
+        def init_classifier(m):
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
+                nn.init.zeros_(m.bias)
+
+        self.classifier.apply(init_classifier)
 
     def forward(self, images, time_dists=None):
         """

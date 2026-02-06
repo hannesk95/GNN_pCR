@@ -3,16 +3,6 @@ import monai
 import torch.nn as nn
 from torchsummary import summary
 
-# -------------------------
-# Weight initialization
-# -------------------------
-def init_weights(m):
-    if isinstance(m, (nn.Conv3d, nn.Linear)):
-        nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
-        if m.bias is not None:
-            nn.init.zeros_(m.bias)
-
-
 class CNN(nn.Module):
     def __init__(self, num_timepoints = None):
         super().__init__()
@@ -34,7 +24,12 @@ class CNN(nn.Module):
             nn.Linear(64, 2),
         )
 
-        self.apply(init_weights)
+        def init_classifier(m):
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
+                nn.init.zeros_(m.bias)
+
+        self.classifier.apply(init_classifier)
 
     def forward(self, images):
         """
