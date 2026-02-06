@@ -30,8 +30,9 @@ from sklearn.metrics import (
 )
 
 from data.Dataset import ISPY2
-from models.CNN import CNN
-from models.CNN_distLSTM import CNNdistLSTM
+from models.supervised.CNN import CNN
+from models.supervised.CNN_LSTM import CNNLSTM
+from models.supervised.CNN_distance_LSTM import CNNdistLSTM
 from utils.utils import log_all_python_files, seed_worker, set_deterministic
 
 
@@ -99,16 +100,18 @@ def main(method, timepoints, fold):
     val_dl = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, persistent_workers=True, worker_init_fn=seed_worker, generator=g)
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, persistent_workers=True, worker_init_fn=seed_worker, generator=g)
 
-    if method == "CNN_LSTM":
-        # model = CNNLSTM().cuda()
-        model = CNNdistLSTM(use_time_distances=False).cuda()
+    if method == "CNN":
+        model = CNN(num_timepoints=timepoints).cuda() 
+    elif method == "CNN_LSTM":
+        model = CNNLSTM().cuda()
     elif method == "CNN_distLSTM":
-        model = CNNdistLSTM(use_time_distances=True).cuda()
-    elif method == "CNN":
-        model = CNN(num_timepoints=timepoints).cuda()    
+        model = CNNdistLSTM(use_time_distances=True).cuda()       
     else:
         raise ValueError(f"Unknown method: {method}")
     
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    mlflow.log_param('num_params', num_params)
+
     scaler = GradScaler()
     optimizer = torch.optim.SGD(model.parameters(), lr=1e-2, nesterov=True, momentum=0.99, weight_decay=3e-5)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
@@ -134,7 +137,7 @@ def main(method, timepoints, fold):
             with torch.amp.autocast("cuda"):
                 if method == "CNN_distLSTM":
                     time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
-                    time_dists = time_dists - torch.min(time_dists)
+                    # time_dists = time_dists - torch.min(time_dists)
                     logits = model(images, time_dists)
                 else:
                     logits = model(images)
@@ -175,7 +178,7 @@ def main(method, timepoints, fold):
                 with torch.amp.autocast("cuda"):
                     if method == "CNN_distLSTM":
                         time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
-                        time_dists = time_dists - torch.min(time_dists)
+                        # time_dists = time_dists - torch.min(time_dists)
                         logits = model(images, time_dists)
                     else:
                         logits = model(images)
@@ -226,7 +229,7 @@ def main(method, timepoints, fold):
 
         if epoch == 1:            
             best_val_loss = val_loss
-            best_val_metric = val_bal_acc
+            best_val_metric = val_mcc
             torch.save(model.state_dict(), f"{method}_best_loss.pt")
             torch.save(model.state_dict(), f"{method}_best_metric.pt")
             mlflow.log_artifact(f"{method}_best_loss.pt")
@@ -237,8 +240,8 @@ def main(method, timepoints, fold):
             torch.save(model.state_dict(), f"{method}_best_loss.pt")
             mlflow.log_artifact(f"{method}_best_loss.pt")
         
-        if val_bal_acc >= best_val_metric:
-            best_val_metric = val_bal_acc
+        if val_mcc >= best_val_metric:
+            best_val_metric = val_mcc
             torch.save(model.state_dict(), f"{method}_best_metric.pt")
             mlflow.log_artifact(f"{method}_best_metric.pt")
         
@@ -262,7 +265,7 @@ def main(method, timepoints, fold):
             with torch.amp.autocast("cuda"):
                 if method == "CNN_distLSTM":
                     time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
-                    time_dists = time_dists - torch.min(time_dists)
+                    # time_dists = time_dists - torch.min(time_dists)
                     logits = model(images, time_dists)
                 else:
                     logits = model(images)
@@ -295,8 +298,7 @@ def main(method, timepoints, fold):
     # clean up
     os.remove(f"{method}_best_loss.pt")
     os.remove(f"{method}_best_metric.pt")
-    os.remove(f"{method}_latest_epoch.pt")
-    
+    os.remove(f"{method}_latest_epoch.pt")    
 
 if __name__ == "__main__":    
 
@@ -304,6 +306,7 @@ if __name__ == "__main__":
         for timepoints in [4]:
             for fold in range(5):
 
+                mlflow.set_tracking_uri("file:./mlruns")
                 mlflow.set_experiment("supervised_baselines")                
 
                 mlflow.end_run()  # end previous run if any
