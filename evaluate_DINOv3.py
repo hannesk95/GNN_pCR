@@ -230,6 +230,7 @@ if __name__ == '__main__':
         for timepoints in [1, 2, 3, 4]:            
             for fold in range(5):
         
+                mlflow.set_tracking_uri("file:./mlruns")
                 mlflow.set_experiment("DINOv3")
                 
                 mlflow.end_run()  # end previous run if any

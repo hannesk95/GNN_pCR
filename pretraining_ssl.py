@@ -352,6 +352,8 @@ if __name__ == '__main__':
         for timepoints in [4]:
             for fold in range(5):
 
+                mlflow.set_tracking_uri("file:./mlruns")
+
                 if args.skip_loss:
                     print(f"Starting experiment with skipping {args.skip_loss}...")
                     mlflow.set_experiment(f"self-supervised-pretraining_wo_{args.skip_loss}")

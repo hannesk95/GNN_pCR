@@ -142,6 +142,7 @@ if __name__ == "__main__":
 
                 checkpoint_path = checkpoints_dict[method][f"fold_{fold}_best_metric"]
 
+                mlflow.set_tracking_uri("file:./mlruns")
                 mlflow.set_experiment("end-to-end_3_timepoints")
 
                 mlflow.end_run()  # end previous run if any

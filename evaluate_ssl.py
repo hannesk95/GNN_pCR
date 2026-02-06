@@ -233,6 +233,8 @@ if __name__ == '__main__':
             for fold in range(5):
                 
                 checkpoint_path = checkpoints_dict[method][f"fold_{fold}_best_metric"]
+                
+                mlflow.set_tracking_uri("file:./mlruns")
                 mlflow.set_experiment("self-supervised-pretraining_evaluation")
                 
                 mlflow.end_run()  # end previous run if any
