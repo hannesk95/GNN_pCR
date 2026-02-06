@@ -92,7 +92,7 @@ class CNNdistLSTM(nn.Module):
                 nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
                 nn.init.zeros_(m.bias)
 
-        self.classifier.apply(init_classifier)
+        # self.classifier.apply(init_classifier)
 
     def forward(self, images, time_dists=None):
         """
