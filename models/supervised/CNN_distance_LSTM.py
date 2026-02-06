@@ -1,9 +1,68 @@
 import torch
 import monai
 import torch.nn as nn
-from torchsummary import summary
-from distance_LSTM import LSTMFromScratch
+import math
 
+class LSTMFromScratch(nn.Module):
+    def __init__(self, input_size, hidden_size, use_time_distances=False):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.use_time_distances = use_time_distances
+
+        # Combine all gates into one big matrix for efficiency
+        self.W = nn.Parameter(torch.Tensor(input_size, 4 * hidden_size))
+        self.U = nn.Parameter(torch.Tensor(hidden_size, 4 * hidden_size))
+        self.bias = nn.Parameter(torch.Tensor(4 * hidden_size))
+
+        if self.use_time_distances:
+            self.time_W = nn.Parameter(torch.Tensor(1, 4 * hidden_size))
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        std = 1.0 / math.sqrt(self.hidden_size)
+        for p in self.parameters():
+            nn.init.uniform_(p, -std, std)
+
+    def forward(self, x, initial_state=None, time_distances=None):
+        """
+        x: (batch, seq_len, input_size)
+        initial_state: tuple(h0, c0) each (batch, hidden_size)
+        """
+
+        batch_size, seq_len, _ = x.size()
+
+        if initial_state is None:
+            h = torch.zeros(batch_size, self.hidden_size, device=x.device)
+            c = torch.zeros(batch_size, self.hidden_size, device=x.device)
+        else:
+            h, c = initial_state
+
+        outputs = []
+
+        for t in range(seq_len):
+            x_t = x[:, t, :]
+
+            gates = x_t @ self.W + h @ self.U + self.bias
+            if self.use_time_distances and time_distances is not None:
+                time_dist_t = time_distances[:, t]  # (batch, 1)
+                gates = gates + time_dist_t * self.time_W
+
+            f, i, o, g = gates.chunk(4, dim=1)
+
+            f = torch.sigmoid(f)
+            i = torch.sigmoid(i)
+            o = torch.sigmoid(o)
+            g = torch.tanh(g)
+
+            c = f * c + i * g
+            h = o * torch.tanh(c)
+
+            outputs.append(h.unsqueeze(1))
+
+        outputs = torch.cat(outputs, dim=1)
+        return outputs, (h, c)
 
 class CNNdistLSTM(nn.Module):
     def __init__(self, use_time_distances=True):
