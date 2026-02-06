@@ -30,8 +30,8 @@ from sklearn.metrics import (
 )
 
 from data.Dataset import ISPY2
-from models.CNN import CNN
-from models.CNN_distLSTM import CNNdistLSTM
+from models.supervised.CNN import CNN
+from models.supervised.CNN_distance_LSTM import CNNdistLSTM
 from utils.utils import log_all_python_files, seed_worker, set_deterministic
 
 
@@ -57,7 +57,7 @@ def main(method, timepoints, fold, checkpoint_path):
     else:
         test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints)
 
-    test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, persistent_workers=True, worker_init_fn=seed_worker, generator=g)
+    test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
     if method == "CNN_LSTM":
         # model = CNNLSTM().cuda()
@@ -68,6 +68,9 @@ def main(method, timepoints, fold, checkpoint_path):
         model = CNN(num_timepoints=timepoints).cuda()    
     else:
         raise ValueError(f"Unknown method: {method}")    
+    
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    mlflow.log_param('num_params', num_params)
     
     # Test evaluation
     test_true_list = []
