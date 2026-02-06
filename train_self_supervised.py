@@ -413,9 +413,9 @@ def main(method, timepoints, fold, skip_loss):
         mlflow.log_metric(f'test_sensitivity_{checkpoint_name}', sensitivity)
         mlflow.log_metric(f'test_specificity_{checkpoint_name}', specificity)
     
-    os.remove('model_best_metric.pt')
-    os.remove('model_best_loss.pt')  
-    os.remove('model_latest_epoch.pt')
+    os.remove(f'{method}_best_metric.pt')
+    os.remove(f'{method}_best_loss.pt')  
+    os.remove(f'{method}_latest_epoch.pt')
 
 if __name__ == '__main__':
     
