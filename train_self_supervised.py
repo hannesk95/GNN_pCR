@@ -42,9 +42,9 @@ from sklearn.svm import SVC
 
 from data.Dataset import ISPY2
 
-from models.Janickova import ResNet18EncoderJanickova
-from models.Kaczmarek import ResNet18EncoderKaczmarek
-from models.Kiechle import ResNet18EncoderKiechle
+from models.self_supervised.Janickova import ResNet18EncoderJanickova
+from models.self_supervised.Kaczmarek import ResNet18EncoderKaczmarek
+from models.self_supervised.Kiechle import ResNet18EncoderKiechle
 
 from utils.pretraining_engine import (
     train_epoch_janickova,
