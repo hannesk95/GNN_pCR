@@ -433,5 +433,5 @@ if __name__ == '__main__':
                     mlflow.set_experiment(f"self-supervised-pretraining")
 
                 mlflow.end_run()  # end previous run if any
-                with mlflow.start_run():
+                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
                     main(method, timepoints, fold, args.skip_loss)
