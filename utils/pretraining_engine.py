@@ -561,13 +561,17 @@ def train_epoch_kiechle(
     loss_orthogonal_epoch = []
     loss_total_epoch = []
 
+    zs, ys = [], []
+
     optimizer.zero_grad()
 
     # Iterate over batches in the data loader
     for step, batch_data in tqdm(enumerate(loader), total=len(loader)):
             
         images = batch_data[0].float().to(device)
-        labels = batch_data[1].long().to(device)      
+        labels = batch_data[1].long().to(device)   
+
+        B, T, C, D, H, W = images.shape   
         
         with torch.amp.autocast("cuda"):
             latents = model(images)            
@@ -587,6 +591,9 @@ def train_epoch_kiechle(
         loss_temporal_epoch.append(loss_temporal.item())
         loss_orthogonal_epoch.append(loss_orthogonal.item())
         loss_total_epoch.append(loss.item())      
+
+        zs.append(latents[:B, :].cpu())
+        ys.append(labels.cpu())
     
         # perform optimizer step every accum_steps
         if (step + 1) % accumulation_steps == 0:
@@ -603,12 +610,13 @@ def train_epoch_kiechle(
         mlflow.log_metric('lr', lr_scheduler.get_last_lr()[0], step=epoch)        
         lr_scheduler.step()
 
-    return {
-        'total': sum(loss_total_epoch) / len(loss_total_epoch),
-        'align': sum(loss_align_epoch) / len(loss_align_epoch),
-        'orthogonal': sum(loss_orthogonal_epoch) / len(loss_orthogonal_epoch),
-        'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch)
-    }
+    losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
+              'align': sum(loss_align_epoch) / len(loss_align_epoch),
+              'orthogonal': sum(loss_orthogonal_epoch) / len(loss_orthogonal_epoch),
+              'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch)
+              }
+    
+    return losses, zs, ys
 
 def eval_epoch_kiechle(
         model: nn.Module,
@@ -674,17 +682,12 @@ def eval_epoch_kiechle(
             zs.append(latents[:B, :].cpu())
             ys.append(labels.cpu())
         
-        results = analyze_latent_space(torch.cat(zs), torch.cat(ys), epoch=epoch, split="val")
-        
-        losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
-                  'align': sum(loss_align_epoch) / len(loss_align_epoch),
-                  'orthogonal': sum(loss_orthogonal_epoch) / len(loss_orthogonal_epoch),
-                  'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch)}
-
-        metrics = {'val_auc': results['linear_probe_auc'],
-                   'val_bacc': results['linear_probe_bacc']}
+    losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
+              'align': sum(loss_align_epoch) / len(loss_align_epoch),
+              'orthogonal': sum(loss_orthogonal_epoch) / len(loss_orthogonal_epoch),
+              'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch)}
             
-    return losses, metrics
+    return losses, zs, ys
 
 def inference_kiechle(
         model: nn.Module,                

@@ -57,7 +57,7 @@ from utils.pretraining_engine import (
     inference_kaczmarek,
     inference_kiechle,    
 )
-from utils.utils import log_all_python_files, seed_worker, set_deterministic
+from utils.utils import log_all_python_files, seed_worker, set_deterministic, plot_umap, linear_probe
 
 
 BATCH_SIZE = 16
@@ -184,7 +184,7 @@ def main(method, timepoints, fold, skip_loss):
             
         elif method == "kiechle":                
             
-            train_losses = train_epoch_kiechle(
+            train_losses, train_z, train_y = train_epoch_kiechle(
                     model=model,                    
                     loader=train_dl,
                     optimizer=optimizer,
@@ -197,7 +197,7 @@ def main(method, timepoints, fold, skip_loss):
                     skip_loss=skip_loss
             )
 
-            val_losses, val_metrics = eval_epoch_kiechle(
+            val_losses, val_z, val_y = eval_epoch_kiechle(
                 model=model,                   
                 loader=val_dl,
                 timepoints=timepoints,
@@ -250,6 +250,10 @@ def main(method, timepoints, fold, skip_loss):
             mlflow.log_metric('val_align_loss', val_losses['align'], step=epoch)  
             mlflow.log_metric('val_temporal_loss', val_losses['temporal'], step=epoch)  
 
+        plot_umap(z=train_z, y=train_y, epoch=epoch, split="train")
+        plot_umap(z=val_z, y=val_y, epoch=epoch, split="val")
+        linear_probe_auc, linear_probe_bacc, linear_probe_mcc = linear_probe(z_train=train_z, y_train=train_y, z_val=val_z, y_val=val_y)
+        
         if epoch == 1:
             torch.save(model.state_dict(), f'{method}_best_loss.pt') 
             torch.save(model.state_dict(), f'{method}_best_metric.pt') 
@@ -261,8 +265,8 @@ def main(method, timepoints, fold, skip_loss):
             torch.save(model.state_dict(), f'{method}_best_loss.pt')
             mlflow.log_artifact(f'{method}_best_loss.pt')               
         
-        if val_metrics['val_bacc'] >= best_val_metric:
-            best_val_metric = val_metrics['val_bacc']
+        if linear_probe_mcc >= best_val_metric:
+            best_val_metric = linear_probe_mcc
             torch.save(model.state_dict(), f'{method}_best_metric.pt')
             mlflow.log_artifact(f'{method}_best_metric.pt')               
 
@@ -273,7 +277,6 @@ def main(method, timepoints, fold, skip_loss):
     mlflow.log_param('best_val_bacc', best_val_metric)
 
     # Test evaluation
-
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
     val_dl = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)

@@ -1,8 +1,13 @@
+import os
 import random
 import numpy as np
 import torch
 import mlflow
 from pathlib import Path
+import umap
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score, balanced_accuracy_score, matthews_corrcoef
 
 def set_deterministic():
     seed = 42
@@ -33,3 +38,32 @@ def log_all_python_files(parent_dir="."):
         if not "conda_env" in str(py_file):
             if not "mlruns" in str(py_file):
                 mlflow.log_artifact(str(py_file))
+
+def plot_umap(z, y, epoch, split):
+    reducer = umap.UMAP()
+    emb = reducer.fit_transform(z.numpy())
+
+    plt.figure(figsize=(6, 6))
+    plt.scatter(emb[y==0, 0], emb[y==0, 1], s=10, alpha=0.5, label="NR")
+    plt.scatter(emb[y==1, 0], emb[y==1, 1], s=10, alpha=0.8, label="CR")
+    plt.legend()
+    plt.title("Latent space (UMAP)")
+    plt.savefig(f"./latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png", dpi=300)
+    plt.close()
+    mlflow.log_artifact(f"./latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png")
+    os.remove(f"./latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png")
+
+
+def linear_probe(z_train, y_train, z_val, y_val):
+    
+    clf = LogisticRegression(max_iter=500)
+    clf.fit(z_train.numpy(), y_train.numpy())
+
+    preds = clf.predict(z_val.numpy())
+    probs = clf.predict_proba(z_val.numpy())[:, 1]    
+
+    auc = roc_auc_score(y_val.numpy(), probs)
+    bacc = balanced_accuracy_score(y_val.numpy(), preds)
+    mcc = matthews_corrcoef(y_val.numpy(), preds)
+
+    return auc, bacc, mcc
