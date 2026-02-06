@@ -251,23 +251,23 @@ def main(method, timepoints, fold, skip_loss):
             mlflow.log_metric('val_temporal_loss', val_losses['temporal'], step=epoch)  
 
         if epoch == 1:
-            torch.save(model.state_dict(), 'model_best_loss.pt') 
-            torch.save(model.state_dict(), 'model_best_metric.pt') 
-            mlflow.log_artifact('model_best_loss.pt')               
-            mlflow.log_artifact('model_best_metric.pt')
+            torch.save(model.state_dict(), f'{method}_best_loss.pt') 
+            torch.save(model.state_dict(), f'{method}_best_metric.pt') 
+            mlflow.log_artifact(f'{method}_best_loss.pt')               
+            mlflow.log_artifact(f'{method}_best_metric.pt')
 
         if val_losses['total'] <= best_val_loss:
             best_val_loss = val_losses['total']
-            torch.save(model.state_dict(), 'model_best_loss.pt')
-            mlflow.log_artifact('model_best_loss.pt')               
+            torch.save(model.state_dict(), f'{method}_best_loss.pt')
+            mlflow.log_artifact(f'{method}_best_loss.pt')               
         
         if val_metrics['val_bacc'] >= best_val_metric:
             best_val_metric = val_metrics['val_bacc']
-            torch.save(model.state_dict(), 'model_best_metric.pt')
-            mlflow.log_artifact('model_best_metric.pt')               
+            torch.save(model.state_dict(), f'{method}_best_metric.pt')
+            mlflow.log_artifact(f'{method}_best_metric.pt')               
 
-        torch.save(model.state_dict(), 'model_latest_epoch.pt')
-        mlflow.log_artifact('model_latest_epoch.pt') 
+        torch.save(model.state_dict(), f'{method}_latest_epoch.pt')
+        mlflow.log_artifact(f'{method}_latest_epoch.pt') 
 
     mlflow.log_param('best_val_loss', best_val_loss)  
     mlflow.log_param('best_val_bacc', best_val_metric)
@@ -278,7 +278,7 @@ def main(method, timepoints, fold, skip_loss):
     val_dl = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
-    for checkpoint in ['model_best_loss.pt', 'model_best_metric.pt', 'model_latest_epoch.pt']:
+    for checkpoint in [f'{method}_best_loss.pt', f'{method}_best_metric.pt', f'{method}_latest_epoch.pt']:
         checkpoint_name = checkpoint.replace('.pt','')        
 
         model.load_state_dict(torch.load(checkpoint))        
