@@ -47,6 +47,8 @@ def train_epoch_janickova(
     loss_temporal_epoch = []
     loss_align_epoch = []
     loss_total_epoch = []    
+    zs = []
+    ys = []
 
     temporal_distances_mapping = [1.0, 0.75, 0.5, 0.25]
     optimizer.zero_grad()
@@ -54,7 +56,9 @@ def train_epoch_janickova(
     for step, batch_data in tqdm(enumerate(loader), total=len(loader)):        
         
         images = batch_data[0].float().to(device)
-        labels = batch_data[1].long().to(device)        
+        labels = batch_data[1].long().to(device) 
+
+        B, T, C, D, H, W = images.shape          
         
         with torch.amp.autocast("cuda"):
             latents = model(images)
@@ -90,7 +94,10 @@ def train_epoch_janickova(
         loss_temporal_epoch.append(loss_temporal.item())
         loss_align_epoch.append(loss_align.item()) 
         loss_total_epoch.append(loss.item())
-           
+
+        latents_original = latents_original.view(B, -1)
+        zs.append(latents_original[:B, :].detach().cpu().numpy())
+        ys.append(labels.cpu().numpy())           
         
         # perform optimizer step every accum_steps
         if (step + 1) % accumulation_steps == 0:
@@ -108,11 +115,14 @@ def train_epoch_janickova(
         lr_scheduler.step()                
 
     # Return the average loss values for the epoch
-    return {
-        'total': sum(loss_total_epoch) / len(loss_total_epoch),
-        'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch),
-        'align': sum(loss_align_epoch) / len(loss_align_epoch),
-    }
+    losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
+              'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch),
+              'align': sum(loss_align_epoch) / len(loss_align_epoch)}
+
+    zs = np.concatenate(zs, axis=0)
+    ys = np.concatenate(ys, axis=0)
+    
+    return losses, zs, ys
 
 def eval_epoch_janickova(
         model: nn.Module,
@@ -194,19 +204,17 @@ def eval_epoch_janickova(
             loss_total_epoch.append(loss.item())     
 
             latents_original = latents_original.view(B, -1)
-            zs.append(latents_original[:B, :].cpu())
-            ys.append(labels.cpu()) 
-        
-        results = analyze_latent_space(torch.cat(zs), torch.cat(ys), epoch=epoch, split="val")
+            zs.append(latents_original[:B, :].cpu().numpy())
+            ys.append(labels.cpu().numpy()) 
         
         losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
                   'align': sum(loss_align_epoch) / len(loss_align_epoch),
                   'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch)}
-        
-        metrics = {'val_auc': results['linear_probe_auc'],
-                   'val_bacc': results['linear_probe_bacc']}
     
-    return losses, metrics        
+        zs = np.concatenate(zs, axis=0)
+        ys = np.concatenate(ys, axis=0)        
+    
+    return losses, zs, ys        
 
 def inference_janickova(
         model: nn.Module,                
@@ -329,6 +337,8 @@ def train_epoch_kaczmarek(
 
     optimizer.zero_grad()
 
+    zs, ys = [], []
+
     for step, batch_data in tqdm(enumerate(loader), total=len(loader)):
         
         images = batch_data[0].float().to(device)
@@ -351,7 +361,10 @@ def train_epoch_kaczmarek(
 
         loss_temporal_epoch.append(loss_temporal.item())
         loss_align_epoch.append(loss_align.item()) 
-        loss_total_epoch.append(loss.item())       
+        loss_total_epoch.append(loss.item())   
+
+        zs.append(latents_original.detach().cpu().numpy())
+        ys.append(labels.cpu().numpy())            
 
         # perform optimizer step every accum_steps
         if (step + 1) % accumulation_steps == 0:
@@ -369,11 +382,15 @@ def train_epoch_kaczmarek(
         lr_scheduler.step()    
 
     # Return the average loss values for the epoch
-    return {
-        'total': sum(loss_total_epoch) / len(loss_total_epoch),
-        'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch),
-        'align': sum(loss_align_epoch) / len(loss_align_epoch),
-    }
+    losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
+              'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch),
+              'align': sum(loss_align_epoch) / len(loss_align_epoch)}
+    
+    zs = np.concatenate(zs, axis=0)
+    ys = np.concatenate(ys, axis=0)
+
+    return losses, zs, ys
+
 
 def eval_epoch_kaczmarek(
         model: nn.Module,
@@ -437,18 +454,17 @@ def eval_epoch_kaczmarek(
             loss_align_epoch.append(loss_align.item()) 
             loss_total_epoch.append(loss.item())   
 
-            zs.append(latents_original.cpu())
-            ys.append(labels.cpu()) 
+            zs.append(latents_original.cpu().numpy())
+            ys.append(labels.cpu().numpy()) 
 
-    results = analyze_latent_space(torch.cat(zs), torch.cat(ys), epoch=epoch, split="val")
     losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
               'align': sum(loss_align_epoch) / len(loss_align_epoch),
               'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch)}
-    metrics = {'val_auc': results['linear_probe_auc'],
-               'val_bacc': results['linear_probe_bacc']}
+    
+    zs = np.concatenate(zs, axis=0)
+    ys = np.concatenate(ys, axis=0)
 
-
-    return losses, metrics
+    return losses, zs, ys
 
 def inference_kaczmarek(
         model: nn.Module,                
@@ -592,8 +608,8 @@ def train_epoch_kiechle(
         loss_orthogonal_epoch.append(loss_orthogonal.item())
         loss_total_epoch.append(loss.item())      
 
-        zs.append(latents[:B, :].cpu())
-        ys.append(labels.cpu())
+        zs.append(latents[:B, :].detach().cpu().numpy())
+        ys.append(labels.cpu().numpy())
     
         # perform optimizer step every accum_steps
         if (step + 1) % accumulation_steps == 0:
@@ -615,6 +631,9 @@ def train_epoch_kiechle(
               'orthogonal': sum(loss_orthogonal_epoch) / len(loss_orthogonal_epoch),
               'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch)
               }
+    
+    zs = np.concatenate(zs, axis=0)
+    ys = np.concatenate(ys, axis=0)
     
     return losses, zs, ys
 
@@ -679,13 +698,16 @@ def eval_epoch_kiechle(
             loss_orthogonal_epoch.append(loss_orthogonal.item())
             loss_total_epoch.append(loss.item())       
 
-            zs.append(latents[:B, :].cpu())
-            ys.append(labels.cpu())
+            zs.append(latents[:B, :].cpu().numpy())
+            ys.append(labels.cpu().numpy())
         
     losses = {'total': sum(loss_total_epoch) / len(loss_total_epoch),
               'align': sum(loss_align_epoch) / len(loss_align_epoch),
               'orthogonal': sum(loss_orthogonal_epoch) / len(loss_orthogonal_epoch),
               'temporal': sum(loss_temporal_epoch) / len(loss_temporal_epoch)}
+
+    zs = np.concatenate(zs, axis=0)
+    ys = np.concatenate(ys, axis=0)
             
     return losses, zs, ys
 

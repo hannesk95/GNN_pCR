@@ -151,7 +151,7 @@ def main(method, timepoints, fold, skip_loss):
     for epoch in tqdm(range(1,EPOCHS+1)):
 
         if method == "kaczmarek":
-            train_losses = train_epoch_kaczmarek(
+            train_losses, train_z, train_y = train_epoch_kaczmarek(
                 model=model,
                 loader=train_dl,
                 optimizer=optimizer,
@@ -164,7 +164,7 @@ def main(method, timepoints, fold, skip_loss):
                 lr_scheduler=lr_scheduler
             )
 
-            val_losses, val_metrics = eval_epoch_kaczmarek(
+            val_losses, val_z, val_y = eval_epoch_kaczmarek(
                 model=model,
                 loader=val_dl,
                 device=device,
@@ -219,7 +219,7 @@ def main(method, timepoints, fold, skip_loss):
 
         elif method == "janickova":
             
-            train_losses = train_epoch_janickova(
+            train_losses, train_z, train_y = train_epoch_janickova(
                 model=model,
                 loader=train_dl,
                 optimizer=optimizer,
@@ -232,7 +232,7 @@ def main(method, timepoints, fold, skip_loss):
                 lr_scheduler=lr_scheduler
             )
 
-            val_losses, val_metrics = eval_epoch_janickova(
+            val_losses, val_z, val_y = eval_epoch_janickova(
                 model=model,
                 loader=val_dl,
                 timepoints=timepoints,
@@ -253,6 +253,10 @@ def main(method, timepoints, fold, skip_loss):
         plot_umap(z=train_z, y=train_y, epoch=epoch, split="train")
         plot_umap(z=val_z, y=val_y, epoch=epoch, split="val")
         linear_probe_auc, linear_probe_bacc, linear_probe_mcc = linear_probe(z_train=train_z, y_train=train_y, z_val=val_z, y_val=val_y)
+
+        mlflow.log_metric('linear_probe_auc', linear_probe_auc, step=epoch)
+        mlflow.log_metric('linear_probe_bacc', linear_probe_bacc, step=epoch)
+        mlflow.log_metric('linear_probe_mcc', linear_probe_mcc, step=epoch)
         
         if epoch == 1:
             torch.save(model.state_dict(), f'{method}_best_loss.pt') 
@@ -423,7 +427,7 @@ def main(method, timepoints, fold, skip_loss):
 if __name__ == '__main__':
     
     # for method in ["kiechle", "kaczmarek", "janickova"]:
-    for method in ["kiechle"]:
+    for method in ["kaczmarek"]:
         for timepoints in [4]:
             for fold in range(5):
 

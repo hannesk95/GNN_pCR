@@ -41,7 +41,7 @@ def log_all_python_files(parent_dir="."):
 
 def plot_umap(z, y, epoch, split):
     reducer = umap.UMAP()
-    emb = reducer.fit_transform(z.numpy())
+    emb = reducer.fit_transform(z)
 
     plt.figure(figsize=(6, 6))
     plt.scatter(emb[y==0, 0], emb[y==0, 1], s=10, alpha=0.5, label="NR")
@@ -57,13 +57,13 @@ def plot_umap(z, y, epoch, split):
 def linear_probe(z_train, y_train, z_val, y_val):
     
     clf = LogisticRegression(max_iter=500)
-    clf.fit(z_train.numpy(), y_train.numpy())
+    clf.fit(z_train, y_train)
 
-    preds = clf.predict(z_val.numpy())
-    probs = clf.predict_proba(z_val.numpy())[:, 1]    
+    preds = clf.predict(z_val)
+    probs = clf.predict_proba(z_val)[:, 1]    
 
-    auc = roc_auc_score(y_val.numpy(), probs)
-    bacc = balanced_accuracy_score(y_val.numpy(), preds)
-    mcc = matthews_corrcoef(y_val.numpy(), preds)
+    auc = roc_auc_score(y_val, probs)
+    bacc = balanced_accuracy_score(y_val, preds)
+    mcc = matthews_corrcoef(y_val, preds)
 
     return auc, bacc, mcc
