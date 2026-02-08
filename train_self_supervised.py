@@ -42,7 +42,7 @@ from sklearn.svm import SVC
 
 from data.Dataset import ISPY2
 
-from models.self_supervised.Janickova import ResNet18EncoderJanickova
+from models.self_supervised.Janickova import ResNet18EncoderJanickova, ResNet18EncoderJanickova_new
 from models.self_supervised.Kaczmarek import ResNet18EncoderKaczmarek
 from models.self_supervised.Kiechle import ResNet18EncoderKiechle
 
@@ -132,7 +132,8 @@ def main(method, timepoints, fold, skip_loss):
         enc.fit(np.array(perms).reshape(-1, 1))
 
     elif method == "janickova":
-        model = ResNet18EncoderJanickova().to(device)
+        # model = ResNet18EncoderJanickova().to(device)
+        model = ResNet18EncoderJanickova_new().to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)
 
@@ -426,19 +427,17 @@ def main(method, timepoints, fold, skip_loss):
 
 if __name__ == '__main__':
     
-    # for method in ["kiechle", "kaczmarek", "janickova"]:
-    for method in ["kaczmarek"]:
-        for timepoints in [4]:
-            for fold in range(5):
+    
+    for skip_loss in ["alignment_loss", "temporal_loss", "orthogonality_loss"]: # [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]
+        for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+            for timepoints in [4]:
+                for fold in range(5):
+                    
+                    args.skip_loss = skip_loss
 
-                mlflow.set_tracking_uri("file:./mlruns")
-
-                if args.skip_loss:
-                    print(f"Starting experiment with skipping {args.skip_loss}...")
-                    mlflow.set_experiment(f"self-supervised-pretraining_wo_{args.skip_loss}")
-                else:
+                    mlflow.set_tracking_uri("file:./mlruns")                    
                     mlflow.set_experiment(f"self-supervised-pretraining")
 
-                mlflow.end_run()  # end previous run if any
-                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                    main(method, timepoints, fold, args.skip_loss)
+                    mlflow.end_run()  # end previous run if any
+                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                        main(method, timepoints, fold, args.skip_loss)
