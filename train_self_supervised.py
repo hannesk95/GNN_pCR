@@ -65,7 +65,7 @@ ACCUMULATION_STEPS = 4
 EPOCHS = 100
 ALIGN_LABELS = [1.0]
 
-def main(method, timepoints, fold, skip_loss):
+def main(method, timepoints, fold, skip_loss, feature_sim, temperature):
     
     set_deterministic()   
     log_all_python_files()
@@ -76,7 +76,9 @@ def main(method, timepoints, fold, skip_loss):
     mlflow.log_param('timepoints', timepoints)
     mlflow.log_param('fold', fold)   
     mlflow.log_param('skip_loss', skip_loss)
-       
+    mlflow.log_param('feature_sim', feature_sim)
+    mlflow.log_param('temperature', temperature)
+
     mlflow.log_param('batch_size', BATCH_SIZE)
     mlflow.log_param('accumulation_steps', ACCUMULATION_STEPS)
     mlflow.log_param('epochs', EPOCHS) 
@@ -195,7 +197,9 @@ def main(method, timepoints, fold, skip_loss):
                     epoch=epoch, 
                     accumulation_steps=ACCUMULATION_STEPS,
                     lr_scheduler=lr_scheduler,
-                    skip_loss=skip_loss
+                    skip_loss=skip_loss,
+                    feature_sim=feature_sim,
+                    temperature=temperature
             )
 
             val_losses, val_z, val_y = eval_epoch_kiechle(
@@ -205,7 +209,9 @@ def main(method, timepoints, fold, skip_loss):
                 device=device,           
                 epoch=epoch,
                 accumulation_steps=ACCUMULATION_STEPS,
-                skip_loss=skip_loss
+                skip_loss=skip_loss,
+                feature_sim=feature_sim,
+                temperature=temperature
             )
 
             mlflow.log_metric('train_total_loss', train_losses['total'], step=epoch)            
@@ -427,17 +433,18 @@ def main(method, timepoints, fold, skip_loss):
 
 if __name__ == '__main__':
     
-    
-    for skip_loss in ["alignment_loss", "temporal_loss", "orthogonality_loss"]: # [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]
-        for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
-            for timepoints in [4]:
-                for fold in range(5):
-                    
-                    args.skip_loss = skip_loss
+    for feature_sim in ['cosine', 'l2']:
+        for temperature in [1.0, 2.0]:
+            for skip_loss in [None]: # [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]
+                for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+                    for timepoints in [4]:
+                        for fold in range(5):
+                            
+                            args.skip_loss = skip_loss
 
-                    mlflow.set_tracking_uri("file:./mlruns")                    
-                    mlflow.set_experiment(f"self-supervised-pretraining")
+                            mlflow.set_tracking_uri("file:./mlruns")                    
+                            mlflow.set_experiment(f"self-supervised-pretraining_new_temporal")
 
-                    mlflow.end_run()  # end previous run if any
-                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                        main(method, timepoints, fold, args.skip_loss)
+                            mlflow.end_run()  # end previous run if any
+                            with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                main(method, timepoints, fold, args.skip_loss, feature_sim, temperature)

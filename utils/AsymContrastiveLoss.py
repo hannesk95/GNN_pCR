@@ -11,13 +11,15 @@ class AsymmetricContrastiveLoss(nn.Module):
     - Ignores non-responder ↔ non-responder relations
     """
 
-    def __init__(self, margin=0.2, lambda_neg=1.0, timepoints=None, skip_loss=None):
+    def __init__(self, margin=0.2, lambda_neg=1.0, timepoints=None, skip_loss=None, temperature=1.0, feature_sim='cosine'):
         super().__init__()
         self.margin = margin
         self.lambda_neg = lambda_neg
         self.timepoints = timepoints
         self.skip_loss = skip_loss
-    
+        self.temperature = temperature
+        self.feature_sim = feature_sim
+        
     def forward(self, z, labels):
         """
         Args:
@@ -78,6 +80,39 @@ class AsymmetricContrastiveLoss(nn.Module):
             if self.skip_loss == "orthogonality_loss":
                 loss_orthogonal = z.sum() * 0.0
             
+            ####################################################
+            # Uncomment the block below for original version
+            ###################################################
+
+            # temporal_loss_list = []
+            # for i in range(z[labels].shape[0]):
+            #     z_0 = z[labels][i][:timepoint_dim]
+            #     z_1 = z[labels][i][timepoint_dim:2*timepoint_dim]
+            #     z_2 = z[labels][i][2*timepoint_dim:3*timepoint_dim]
+            #     z_3 = z[labels][i][-timepoint_dim:]
+
+            #     z_10 = z_1 - z_0
+            #     z_20 = z_2 - z_0
+            #     z_30 = z_3 - z_0
+
+            #     z_21 = z_2 - z_1
+            #     z_31 = z_3 - z_1
+            #     z_32 = z_3 - z_2
+
+            #     l1 = 1.0 - F.cosine_similarity(z_10 + z_21 + z_32, z_30, dim=0)
+            #     l2 = 1.0 - F.cosine_similarity(z_10 + z_21, z_20, dim=0)
+            #     l3 = 1.0 - F.cosine_similarity(z_21 + z_32, z_31, dim=0)
+
+            #     loss_temporal = (l1 + l2 + l3) / 3.0
+            #     temporal_loss_list.append(loss_temporal)                
+                
+            # loss_temporal = torch.stack(temporal_loss_list).mean()  
+
+            ######################################
+            # rank-n-based temporal loss
+            #######################################
+            temporal_loss_fn = RnCLoss(temperature=self.temperature, label_diff='l1', feature_sim='cosine') 
+
             temporal_loss_list = []
             for i in range(z[labels].shape[0]):
                 z_0 = z[labels][i][:timepoint_dim]
@@ -85,22 +120,15 @@ class AsymmetricContrastiveLoss(nn.Module):
                 z_2 = z[labels][i][2*timepoint_dim:3*timepoint_dim]
                 z_3 = z[labels][i][-timepoint_dim:]
 
-                z_10 = z_1 - z_0
-                z_20 = z_2 - z_0
-                z_30 = z_3 - z_0
+                features_temp = torch.stack([z_0, z_1, z_2, z_3], dim=0)  # [4, feat_dim]
+                labels_temp = torch.tensor([0, 1, 2, 3], device=z.device)  # [4]
+                labels_temp = labels_temp.unsqueeze(-1)  # [4, 1]
 
-                z_21 = z_2 - z_1
-                z_31 = z_3 - z_1
-                z_32 = z_3 - z_2
+                loss_temp = temporal_loss_fn(features_temp, labels_temp)
+                temporal_loss_list.append(loss_temp)
 
-                l1 = 1.0 - F.cosine_similarity(z_10 + z_21 + z_32, z_30, dim=0)
-                l2 = 1.0 - F.cosine_similarity(z_10 + z_21, z_20, dim=0)
-                l3 = 1.0 - F.cosine_similarity(z_21 + z_32, z_31, dim=0)
-
-                loss_temporal = (l1 + l2 + l3) / 3.0
-                temporal_loss_list.append(loss_temporal)                
-                
-            loss_temporal = torch.stack(temporal_loss_list).mean()   
+            loss_temporal = torch.stack(temporal_loss_list).mean()
+        
 
             if self.skip_loss == "temporal_loss":
                 loss_temporal = z.sum() * 0.0         
@@ -190,5 +218,72 @@ class CRSupervisedContrastiveLoss(nn.Module):
 
         # All other CR samples are positives
         loss = -log_prob.mean()
+
+        return loss
+
+
+class LabelDifference(nn.Module):
+    def __init__(self, distance_type='l1'):
+        super(LabelDifference, self).__init__()
+        self.distance_type = distance_type
+
+    def forward(self, labels):
+        # labels: [bs, label_dim]
+        # output: [bs, bs]
+        if self.distance_type == 'l1':
+            return torch.abs(labels[:, None, :] - labels[None, :, :]).sum(dim=-1)
+        else:
+            raise ValueError(self.distance_type)
+
+class FeatureSimilarity(nn.Module):
+    def __init__(self, similarity_type='l2'):
+        super(FeatureSimilarity, self).__init__()
+        self.similarity_type = similarity_type
+
+    def forward(self, features):
+        # labels: [bs, feat_dim]
+        # output: [bs, bs]
+        if self.similarity_type == 'l2':
+            return - (features[:, None, :] - features[None, :, :]).norm(2, dim=-1)
+        elif self.similarity_type == 'cosine':
+            return F.cosine_similarity(features[:, None, :], features[None, :, :], dim=-1)
+        else:
+            raise ValueError(self.similarity_type)
+
+
+class RnCLoss(nn.Module):
+    def __init__(self, temperature=2, label_diff='l1', feature_sim='cosine'):
+        super(RnCLoss, self).__init__()
+        self.t = temperature
+        self.label_diff_fn = LabelDifference(label_diff)
+        self.feature_sim_fn = FeatureSimilarity(feature_sim)
+
+    def forward(self, features, labels):
+        # features: [bs, 2, feat_dim]
+        # labels: [bs, label_dim]
+
+        # features = torch.cat([features[:, 0], features[:, 1]], dim=0)  # [2bs, feat_dim]
+        # labels = labels.repeat(2, 1)  # [2bs, label_dim]
+
+        label_diffs = self.label_diff_fn(labels)
+        logits = self.feature_sim_fn(features).div(self.t)
+        logits_max, _ = torch.max(logits, dim=1, keepdim=True)
+        logits -= logits_max.detach()
+        exp_logits = logits.exp()
+
+        n = logits.shape[0]  # n = 2bs
+
+        # remove diagonal
+        logits = logits.masked_select((1 - torch.eye(n).to(logits.device)).bool()).view(n, n - 1)
+        exp_logits = exp_logits.masked_select((1 - torch.eye(n).to(logits.device)).bool()).view(n, n - 1)
+        label_diffs = label_diffs.masked_select((1 - torch.eye(n).to(logits.device)).bool()).view(n, n - 1)
+
+        loss = 0.
+        for k in range(n - 1):
+            pos_logits = logits[:, k]  # 2bs
+            pos_label_diffs = label_diffs[:, k]  # 2bs
+            neg_mask = (label_diffs >= pos_label_diffs.view(-1, 1)).float()  # [2bs, 2bs - 1]
+            pos_log_probs = pos_logits - torch.log((neg_mask * exp_logits).sum(dim=-1))  # 2bs
+            loss += - (pos_log_probs / (n * (n - 1))).sum()
 
         return loss
