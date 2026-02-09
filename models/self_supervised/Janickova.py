@@ -91,15 +91,55 @@ class ResNet18EncoderJanickova(nn.Module):
 
         return latent
 
+class ResNet18EncoderJanickova_new(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        # Image encoder
+        model = monai.networks.nets.resnet18(spatial_dims=3, n_input_channels=3, num_classes=2)
+        encoder_layers = list(model.children())[:-1]
+        encoder_layers.append(torch.nn.Flatten(start_dim=1, end_dim=-1))                
+        self.encoder = nn.Sequential(*encoder_layers)  
+
+        # Projector
+        self.projector = nn.Sequential(
+            nn.Linear(in_features=512, out_features=128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Linear(in_features=128, out_features=128)
+        )
+
+    def forward(self, images):
+        """images:   (B, T, C, D, H, W)
+        """
+        B, T, C, D, H, W = images.shape
+   
+        images = images.reshape(B * T, C, D, H, W)
+        features = self.encoder(images)             # (B * T, 512)
+        latent = self.projector(features)           # (B * T, 128)
+
+        latent =  latent.reshape(B, T, -1)          # (B, T, 128)
+
+        return latent
+
 if __name__ == "__main__":
     
-    BATCH_SIZE = 8
+    BATCH_SIZE = 2
     TIMEPOINTS = 4
-    images = torch.randn(BATCH_SIZE, TIMEPOINTS, 3, 32, 32, 32)
+    CHANNELS = 3
+    DEPTH = 32
+    HEIGHT = 32
+    WIDTH = 32
+    
+    images = torch.randn(BATCH_SIZE, TIMEPOINTS, CHANNELS, DEPTH, HEIGHT, WIDTH)
     images = images.cuda() 
 
-    model = ResNet18Encoder().cuda()
-    summary(model, input_size=(TIMEPOINTS, 3, 32, 32, 32))
+    model = ResNet18EncoderJanickova().cuda()
+    # summary(model, input_size=(TIMEPOINTS, CHANNELS, DEPTH, HEIGHT, WIDTH))
     out = model(images)
-
     print(out.shape)  
+
+    model = ResNet18EncoderJanickova_new().cuda()
+    # summary(model, input_size=(TIMEPOINTS, CHANNELS, DEPTH, HEIGHT, WIDTH))
+    out = model(images)
+    print(out.shape)
