@@ -306,7 +306,7 @@ if __name__ == "__main__":
             for fold in range(5):
 
                 mlflow.set_tracking_uri("file:./mlruns")
-                mlflow.set_experiment("supervised_baselines")                
+                mlflow.set_experiment("miccai_2026")                
 
                 mlflow.end_run()  # end previous run if any
                 with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
