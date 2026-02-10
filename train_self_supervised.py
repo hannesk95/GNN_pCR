@@ -65,7 +65,7 @@ ACCUMULATION_STEPS = 4
 EPOCHS = 100
 ALIGN_LABELS = [1.0]
 
-def main(method, timepoints, fold, skip_loss, feature_sim, temperature):
+def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn):
     
     set_deterministic()   
     log_all_python_files()
@@ -78,6 +78,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature):
     mlflow.log_param('skip_loss', skip_loss)
     mlflow.log_param('feature_sim', feature_sim)
     mlflow.log_param('temperature', temperature)
+    mlflow.log_param('use_gnn', use_gnn)
 
     mlflow.log_param('batch_size', BATCH_SIZE)
     mlflow.log_param('accumulation_steps', ACCUMULATION_STEPS)
@@ -140,7 +141,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature):
         mlflow.log_param('model_num_params', model_num_params)
 
     elif method == "kiechle":
-        model = ResNet18EncoderKiechle(timepoints=timepoints).to(device)
+        model = ResNet18EncoderKiechle(timepoints=timepoints, use_gnn=use_gnn).to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)        
     
@@ -292,8 +293,9 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature):
     val_dl = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
+    # for checkpoint in [f'{method}_best_loss.pt', f'{method}_best_metric.pt', f'{method}_latest_epoch.pt']:
     for checkpoint in [f'{method}_best_loss.pt', f'{method}_best_metric.pt', f'{method}_latest_epoch.pt']:
-        checkpoint_name = checkpoint.replace('.pt','')        
+        checkpoint_name = checkpoint.replace('.pt','').replace(f'{method}_', '')        
 
         model.load_state_dict(torch.load(checkpoint))        
 
@@ -432,19 +434,60 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature):
     os.remove(f'{method}_latest_epoch.pt')
 
 if __name__ == '__main__':
+
+    # train and evaluate our method and perform loss function ablations
     
-    for feature_sim in ['cosine', 'l2']:
-        for temperature in [1.0, 2.0]:
-            for skip_loss in [None]: # [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]
-                for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
-                    for timepoints in [4]:
-                        for fold in range(5):
-                            
-                            args.skip_loss = skip_loss
+    for use_gnn in [True]:
+        for feature_sim in ['l2']:
+            for temperature in [2.0]:
+                for skip_loss in [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]:
+                    for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+                        for timepoints in [4]:
+                            for fold in range(5):
+                                
+                                args.skip_loss = skip_loss
 
-                            mlflow.set_tracking_uri("file:./mlruns")                    
-                            mlflow.set_experiment(f"self-supervised-pretraining_new_temporal")
+                                mlflow.set_tracking_uri("file:./mlruns")                    
+                                mlflow.set_experiment(f"miccai_2026")
 
-                            mlflow.end_run()  # end previous run if any
-                            with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                                main(method, timepoints, fold, args.skip_loss, feature_sim, temperature)
+                                mlflow.end_run()  # end previous run if any
+                                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                    main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+    
+    # train and evaluate our method without GNN but all losses
+
+    for use_gnn in [False]:
+        for feature_sim in ['l2']:
+            for temperature in [2.0]:
+                for skip_loss in [None]:
+                    for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+                        for timepoints in [4]:
+                            for fold in range(5):
+                                
+                                args.skip_loss = skip_loss
+
+                                mlflow.set_tracking_uri("file:./mlruns")                    
+                                mlflow.set_experiment(f"miccai_2026")
+
+                                mlflow.end_run()  # end previous run if any
+                                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                    main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+    
+    # train and evaluate SSL comparison methods
+
+    for use_gnn in [None]:
+        for feature_sim in [None]:
+            for temperature in [None]:
+                for skip_loss in [None]:
+                    for method in ["kaczmarek", "janickova"]: # ["kiechle", "kaczmarek", "janickova"]:
+                        for timepoints in [4]:
+                            for fold in range(5):
+                                
+                                args.skip_loss = skip_loss
+
+                                mlflow.set_tracking_uri("file:./mlruns")                    
+                                mlflow.set_experiment(f"miccai_2026")
+
+                                mlflow.end_run()  # end previous run if any
+                                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                    main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
