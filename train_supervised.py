@@ -4,12 +4,8 @@ from glob import glob
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--gpu",
-        type=int,
-        default=0,
-        help="GPU index to use (e.g. 0 or 1)",
-    )
+    parser.add_argument("--gpu", type=int, default=0, help="GPU index to use (e.g. 0 or 1)")
+    parser.add_argument("--fold", type=int, default=None, help="Fold number for cross-validation")
     return parser.parse_args()
 
 
@@ -301,13 +297,28 @@ def main(method, timepoints, fold):
 
 if __name__ == "__main__":    
 
-    for method in ["CNN", "CNN_LSTM", "CNN_distLSTM"]:
-        for timepoints in [4]:
-            for fold in range(5):
+    # If no fold is specified, run all folds sequentially (useful for local runs)
+    if args.fold is None:
+        for method in ["CNN", "CNN_LSTM", "CNN_distLSTM"]:
+            for timepoints in [4]:
+                for fold in range(5):
 
-                mlflow.set_tracking_uri("file:./mlruns")
-                mlflow.set_experiment("miccai_2026")                
+                    mlflow.set_tracking_uri("file:./mlruns")
+                    mlflow.set_experiment("miccai_2026")                
 
-                mlflow.end_run()  # end previous run if any
-                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                    main(method, timepoints, fold)
+                    mlflow.end_run()  # end previous run if any
+                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                        main(method, timepoints, fold)
+    
+    # If fold is specified, only run that fold (useful for parallel runs on cluster)
+    else:
+        for method in ["CNN", "CNN_LSTM", "CNN_distLSTM"]:
+            for timepoints in [4]:
+                for fold in range(args.fold, args.fold+1):
+
+                    mlflow.set_tracking_uri("file:./mlruns")
+                    mlflow.set_experiment("miccai_2026")                
+
+                    mlflow.end_run()  # end previous run if any
+                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                        main(method, timepoints, fold)
