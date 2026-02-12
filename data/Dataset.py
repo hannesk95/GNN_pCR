@@ -122,8 +122,16 @@ class ISPY2(Dataset):
             data = torch.load(files[t])
 
             if self.output_2D:
-                # select middle slice in axial plane
-                data = data[:, :, :, :, data.shape[-1]//2]  # (C, D, H, W) -> (C, D, H)
+
+                try:
+                    ftv = data[0, -1]
+                    non_zero_slices = [i for i in range(ftv.shape[0]) if ftv[i,:,:].sum() > 0]
+                    largest_slice = max(non_zero_slices, key=lambda i: ftv[i,:,:].sum())
+                    data = data[:, :, largest_slice, :, :]
+
+                except:
+                    # select middle slice
+                    data = data[:, :, data.shape[-3]//2, :, :]  # (C, D, H, W) -> (C, D, H)
 
             data_list.append(data)
 
