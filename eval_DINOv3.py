@@ -215,9 +215,9 @@ def main(method, timepoints, fold):
     print(f"Sensitivity       : {sensitivity:.3f}")
     print(f"Specificity       : {specificity:.3f}")
 
-    mlflow.log_metric('test_balanced_accuracy', bal_acc)
+    mlflow.log_metric('test_bal_acc', bal_acc)
     mlflow.log_metric('test_mcc', mcc)
-    mlflow.log_metric('test_auroc', auroc)
+    mlflow.log_metric('test_roc_auc', auroc)
     mlflow.log_metric('test_sensitivity', sensitivity)
     mlflow.log_metric('test_specificity', specificity)
 
@@ -227,11 +227,11 @@ if __name__ == '__main__':
     set_deterministic()
 
     for method in ['DINOv3']:
-        for timepoints in [3, 4]:            
+        for timepoints in [4]:            
             for fold in range(5):
         
                 mlflow.set_tracking_uri("file:./mlruns")
-                mlflow.set_experiment("DINOv3")
+                mlflow.set_experiment("miccai_2026")
                 
                 mlflow.end_run()  # end previous run if any
                 with mlflow.start_run():
