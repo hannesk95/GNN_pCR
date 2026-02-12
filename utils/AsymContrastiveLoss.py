@@ -70,9 +70,14 @@ class AsymmetricContrastiveLoss(nn.Module):
 
                 l1 = torch.abs(F.cosine_similarity(z_0, z_1, dim=0))
                 l2 = torch.abs(F.cosine_similarity(z_1, z_2, dim=0))
-                l3 = torch.abs(F.cosine_similarity(z_2, z_3, dim=0))    
+                l3 = torch.abs(F.cosine_similarity(z_2, z_3, dim=0))
+                # loss_ortho = (l1 + l2 + l3 ) / 3.0
 
-                loss_ortho = (l1 + l2 + l3) / 3.0
+                l4 = torch.abs(F.cosine_similarity(z_0, z_2, dim=0))
+                l5 = torch.abs(F.cosine_similarity(z_0, z_3, dim=0))
+                l6 = torch.abs(F.cosine_similarity(z_1, z_3, dim=0))                
+                loss_ortho = (l1 + l2 + l3 + l4 + l5 + l6) / 6.0
+
                 ortho_loss_list.append(loss_ortho)
 
             loss_orthogonal = torch.stack(ortho_loss_list).mean()            
@@ -107,12 +112,8 @@ class AsymmetricContrastiveLoss(nn.Module):
             #     temporal_loss_list.append(loss_temporal)                
                 
             # loss_temporal = torch.stack(temporal_loss_list).mean()  
-
-            ######################################
-            # rank-n-based temporal loss
-            #######################################
-            temporal_loss_fn = RnCLoss(temperature=self.temperature, label_diff='l1', feature_sim='cosine') 
-
+            
+            # modified original version
             temporal_loss_list = []
             for i in range(z[labels].shape[0]):
                 z_0 = z[labels][i][:timepoint_dim]
@@ -120,14 +121,36 @@ class AsymmetricContrastiveLoss(nn.Module):
                 z_2 = z[labels][i][2*timepoint_dim:3*timepoint_dim]
                 z_3 = z[labels][i][-timepoint_dim:]
 
-                features_temp = torch.stack([z_0, z_1, z_2, z_3], dim=0)  # [4, feat_dim]
-                labels_temp = torch.tensor([0, 1, 2, 3], device=z.device)  # [4]
-                labels_temp = labels_temp.unsqueeze(-1)  # [4, 1]
+                z_10 = z_1 - z_0
+                z_21 = z_2 - z_1
+                z_32 = z_3 - z_2
 
-                loss_temp = temporal_loss_fn(features_temp, labels_temp)
-                temporal_loss_list.append(loss_temp)
+                loss_temporal = 1.0 - F.cosine_similarity(z_10 + z_21 + z_32, z_3, dim=0)
 
-            loss_temporal = torch.stack(temporal_loss_list).mean()
+                temporal_loss_list.append(loss_temporal)                
+                
+            loss_temporal = torch.stack(temporal_loss_list).mean()  
+
+            ######################################
+            # rank-n-based temporal loss
+            #######################################
+            # temporal_loss_fn = RnCLoss(temperature=self.temperature, label_diff='l1', feature_sim='cosine') 
+
+            # temporal_loss_list = []
+            # for i in range(z[labels].shape[0]):
+            #     z_0 = z[labels][i][:timepoint_dim]
+            #     z_1 = z[labels][i][timepoint_dim:2*timepoint_dim]
+            #     z_2 = z[labels][i][2*timepoint_dim:3*timepoint_dim]
+            #     z_3 = z[labels][i][-timepoint_dim:]
+
+            #     features_temp = torch.stack([z_0, z_1, z_2, z_3], dim=0)  # [4, feat_dim]
+            #     labels_temp = torch.tensor([0, 1, 2, 3], device=z.device)  # [4]
+            #     labels_temp = labels_temp.unsqueeze(-1)  # [4, 1]
+
+            #     loss_temp = temporal_loss_fn(features_temp, labels_temp)
+            #     temporal_loss_list.append(loss_temp)
+
+            # loss_temporal = torch.stack(temporal_loss_list).mean()
         
 
             if self.skip_loss == "temporal_loss":
