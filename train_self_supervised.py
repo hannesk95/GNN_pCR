@@ -5,18 +5,9 @@ from glob import glob
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--gpu",
-        type=int,
-        default=0,
-        help="GPU index to use (e.g. 0 or 1)",
-    )
-    parser.add_argument(
-        "--skip_loss",
-        type=str,
-        default=None,
-        help="Specify which loss to skip: alignment_loss, temporal_loss, orthogonality_loss, or None",
-    )
+    parser.add_argument("--gpu", type=int, default=0, help="GPU index to use (e.g. 0 or 1)")
+    parser.add_argument("--fold", type=int, default=None, help="Fold number for cross-validation")
+    parser.add_argument("--skip_loss", type=str, default=None, help="Specify which loss to skip: alignment_loss, temporal_loss, orthogonality_loss, or None")
     return parser.parse_args()
 
 args = parse_args()
@@ -435,59 +426,115 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
 
 if __name__ == '__main__':
 
-    # train and evaluate our method and perform loss function ablations
+    # If no specific fold is provided, run all folds and all experiments (this will take a long time!)
+    if args.fold is None:
+        # train and evaluate our method and perform loss function ablations        
+        for use_gnn in [True]:
+            for feature_sim in [None]:
+                for temperature in [None]:
+                    for skip_loss in [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]:
+                        for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+                            for timepoints in [4]:
+                                for fold in range(5):
+                                    
+                                    args.skip_loss = skip_loss
+
+                                    mlflow.set_tracking_uri("file:./mlruns")                    
+                                    mlflow.set_experiment(f"miccai_2026")
+
+                                    mlflow.end_run()  # end previous run if any
+                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+        
+        # train and evaluate our method without GNN but all losses
+        for use_gnn in [False]:
+            for feature_sim in [None]:
+                for temperature in [None]:
+                    for skip_loss in [None]:
+                        for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+                            for timepoints in [4]:
+                                for fold in range(5):
+                                    
+                                    args.skip_loss = skip_loss
+
+                                    mlflow.set_tracking_uri("file:./mlruns")                    
+                                    mlflow.set_experiment(f"miccai_2026")
+
+                                    mlflow.end_run()  # end previous run if any
+                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+        
+        # train and evaluate SSL comparison methods
+        for use_gnn in [None]:
+            for feature_sim in [None]:
+                for temperature in [None]:
+                    for skip_loss in [None]:
+                        for method in ["kaczmarek", "janickova"]: # ["kiechle", "kaczmarek", "janickova"]:
+                            for timepoints in [4]:
+                                for fold in range(5):
+                                    
+                                    args.skip_loss = skip_loss
+
+                                    mlflow.set_tracking_uri("file:./mlruns")                    
+                                    mlflow.set_experiment(f"miccai_2026")
+
+                                    mlflow.end_run()  # end previous run if any
+                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
     
-    for use_gnn in [True]:
-        for feature_sim in ['l2']:
-            for temperature in [2.0]:
-                for skip_loss in [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]:
-                    for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
-                        for timepoints in [4]:
-                            for fold in range(5):
-                                
-                                args.skip_loss = skip_loss
+    # If a specific fold is provided, only run that fold (useful for parallelization)
+    else:
+        # train and evaluate our method and perform loss function ablations        
+        for use_gnn in [True]:
+            for feature_sim in [None]:
+                for temperature in [None]:
+                    for skip_loss in [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]:
+                        for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+                            for timepoints in [4]:
+                                for fold in range(args.fold, args.fold+1):
+                                    
+                                    args.skip_loss = skip_loss
 
-                                mlflow.set_tracking_uri("file:./mlruns")                    
-                                mlflow.set_experiment(f"miccai_2026")
+                                    mlflow.set_tracking_uri("file:./mlruns")                    
+                                    mlflow.set_experiment(f"miccai_2026")
 
-                                mlflow.end_run()  # end previous run if any
-                                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                                    main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
-    
-    # train and evaluate our method without GNN but all losses
+                                    mlflow.end_run()  # end previous run if any
+                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+        
+        # train and evaluate our method without GNN but all losses
+        for use_gnn in [False]:
+            for feature_sim in [None]:
+                for temperature in [None]:
+                    for skip_loss in [None]:
+                        for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+                            for timepoints in [4]:
+                                for fold in range(args.fold, args.fold+1):
+                                    
+                                    args.skip_loss = skip_loss
 
-    for use_gnn in [False]:
-        for feature_sim in ['l2']:
-            for temperature in [2.0]:
-                for skip_loss in [None]:
-                    for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
-                        for timepoints in [4]:
-                            for fold in range(5):
-                                
-                                args.skip_loss = skip_loss
+                                    mlflow.set_tracking_uri("file:./mlruns")                    
+                                    mlflow.set_experiment(f"miccai_2026")
 
-                                mlflow.set_tracking_uri("file:./mlruns")                    
-                                mlflow.set_experiment(f"miccai_2026")
+                                    mlflow.end_run()  # end previous run if any
+                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+        
+        # train and evaluate SSL comparison methods
+        for use_gnn in [None]:
+            for feature_sim in [None]:
+                for temperature in [None]:
+                    for skip_loss in [None]:
+                        for method in ["kaczmarek", "janickova"]: # ["kiechle", "kaczmarek", "janickova"]:
+                            for timepoints in [4]:
+                                for fold in range(args.fold, args.fold+1):
+                                    
+                                    args.skip_loss = skip_loss
 
-                                mlflow.end_run()  # end previous run if any
-                                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                                    main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
-    
-    # train and evaluate SSL comparison methods
+                                    mlflow.set_tracking_uri("file:./mlruns")                    
+                                    mlflow.set_experiment(f"miccai_2026")
 
-    for use_gnn in [None]:
-        for feature_sim in [None]:
-            for temperature in [None]:
-                for skip_loss in [None]:
-                    for method in ["kaczmarek", "janickova"]: # ["kiechle", "kaczmarek", "janickova"]:
-                        for timepoints in [4]:
-                            for fold in range(5):
-                                
-                                args.skip_loss = skip_loss
+                                    mlflow.end_run()  # end previous run if any
+                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
 
-                                mlflow.set_tracking_uri("file:./mlruns")                    
-                                mlflow.set_experiment(f"miccai_2026")
-
-                                mlflow.end_run()  # end previous run if any
-                                with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                                    main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
