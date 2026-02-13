@@ -39,7 +39,7 @@ def log_all_python_files(parent_dir="."):
             if not "mlruns" in str(py_file):
                 mlflow.log_artifact(str(py_file))
 
-def plot_umap(z, y, epoch, split):
+def plot_umap(z, y, epoch, split, fold):
     reducer = umap.UMAP()
     emb = reducer.fit_transform(z)
 
@@ -48,10 +48,11 @@ def plot_umap(z, y, epoch, split):
     plt.scatter(emb[y==1, 0], emb[y==1, 1], s=10, alpha=0.8, label="CR")
     plt.legend()
     plt.title("Latent space (UMAP)")
-    plt.savefig(f"./latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png", dpi=300)
+    plt.savefig(f"./latent_space_umap_{split}_fold{fold}_epoch_{str(epoch).zfill(3)}.png", dpi=300)
     plt.close()
-    mlflow.log_artifact(f"./latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png")
-    os.remove(f"./latent_space_umap_{split}_epoch_{str(epoch).zfill(3)}.png")
+    
+    mlflow.log_artifact(f"./latent_space_umap_{split}_fold{fold}_epoch_{str(epoch).zfill(3)}.png")
+    os.remove(f"./latent_space_umap_{split}_fold{fold}_epoch_{str(epoch).zfill(3)}.png")
 
 
 def linear_probe(z_train, y_train, z_val, y_val):
@@ -61,7 +62,7 @@ def linear_probe(z_train, y_train, z_val, y_val):
 
     preds = clf.predict(z_val)
     probs = clf.predict_proba(z_val)[:, 1]    
-
+    
     auc = roc_auc_score(y_val, probs)
     bacc = balanced_accuracy_score(y_val, preds)
     mcc = matthews_corrcoef(y_val, preds)

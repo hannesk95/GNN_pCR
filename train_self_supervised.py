@@ -249,8 +249,8 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
             mlflow.log_metric('val_align_loss', val_losses['align'], step=epoch)  
             mlflow.log_metric('val_temporal_loss', val_losses['temporal'], step=epoch)  
 
-        plot_umap(z=train_z, y=train_y, epoch=epoch, split="train")
-        plot_umap(z=val_z, y=val_y, epoch=epoch, split="val")
+        plot_umap(z=train_z, y=train_y, epoch=epoch, split="train", fold=fold)
+        plot_umap(z=val_z, y=val_y, epoch=epoch, split="val", fold=fold)
         linear_probe_auc, linear_probe_bacc, linear_probe_mcc = linear_probe(z_train=train_z, y_train=train_y, z_val=val_z, y_val=val_y)
 
         mlflow.log_metric('linear_probe_auc', linear_probe_auc, step=epoch)
@@ -258,23 +258,23 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
         mlflow.log_metric('linear_probe_mcc', linear_probe_mcc, step=epoch)
         
         if epoch == 1:
-            torch.save(model.state_dict(), f'{method}_best_loss.pt') 
-            torch.save(model.state_dict(), f'{method}_best_metric.pt') 
-            mlflow.log_artifact(f'{method}_best_loss.pt')               
-            mlflow.log_artifact(f'{method}_best_metric.pt')
+            torch.save(model.state_dict(), f'{method}_fold{fold}_best_loss.pt') 
+            torch.save(model.state_dict(), f'{method}_fold{fold}_best_metric.pt') 
+            mlflow.log_artifact(f'{method}_fold{fold}_best_loss.pt')               
+            mlflow.log_artifact(f'{method}_fold{fold}_best_metric.pt')
 
         if val_losses['total'] <= best_val_loss:
             best_val_loss = val_losses['total']
-            torch.save(model.state_dict(), f'{method}_best_loss.pt')
-            mlflow.log_artifact(f'{method}_best_loss.pt')               
+            torch.save(model.state_dict(), f'{method}_fold{fold}_best_loss.pt')
+            mlflow.log_artifact(f'{method}_fold{fold}_best_loss.pt')               
         
         if linear_probe_mcc >= best_val_metric:
             best_val_metric = linear_probe_mcc
-            torch.save(model.state_dict(), f'{method}_best_metric.pt')
-            mlflow.log_artifact(f'{method}_best_metric.pt')               
+            torch.save(model.state_dict(), f'{method}_fold{fold}_best_metric.pt')
+            mlflow.log_artifact(f'{method}_fold{fold}_best_metric.pt')               
 
-        torch.save(model.state_dict(), f'{method}_latest_epoch.pt')
-        mlflow.log_artifact(f'{method}_latest_epoch.pt') 
+        torch.save(model.state_dict(), f'{method}_fold{fold}_latest_epoch.pt')
+        mlflow.log_artifact(f'{method}_fold{fold}_latest_epoch.pt') 
 
     mlflow.log_param('best_val_loss', best_val_loss)  
     mlflow.log_param('best_val_bacc', best_val_metric)
@@ -285,8 +285,8 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
     # for checkpoint in [f'{method}_best_loss.pt', f'{method}_best_metric.pt', f'{method}_latest_epoch.pt']:
-    for checkpoint in [f'{method}_best_loss.pt', f'{method}_best_metric.pt', f'{method}_latest_epoch.pt']:
-        checkpoint_name = checkpoint.replace('.pt','').replace(f'{method}_', '')        
+    for checkpoint in [f'{method}_fold{fold}_best_loss.pt', f'{method}_fold{fold}_best_metric.pt', f'{method}_fold{fold}_latest_epoch.pt']:
+        checkpoint_name = checkpoint.replace('.pt','').replace(f'{method}_fold{fold}_', '')        
 
         model.load_state_dict(torch.load(checkpoint))        
 
@@ -420,9 +420,9 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
         mlflow.log_metric(f'test_sensitivity_{checkpoint_name}', sensitivity)
         mlflow.log_metric(f'test_specificity_{checkpoint_name}', specificity)
     
-    os.remove(f'{method}_best_metric.pt')
-    os.remove(f'{method}_best_loss.pt')  
-    os.remove(f'{method}_latest_epoch.pt')
+    os.remove(f'{method}_fold{fold}_best_metric.pt')
+    os.remove(f'{method}_fold{fold}_best_loss.pt')  
+    os.remove(f'{method}_fold{fold}_latest_epoch.pt')
 
 if __name__ == '__main__':
 
