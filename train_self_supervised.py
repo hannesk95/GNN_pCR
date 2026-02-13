@@ -350,7 +350,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
 
         outer_scores = []
 
-        for fold, (train_idx, val_idx) in enumerate(
+        for fold_sklearn, (train_idx, val_idx) in enumerate(
             outer_cv.split(X_trainval, y_trainval), 1
         ):
             X_tr, X_va = X_trainval[train_idx], X_trainval[val_idx]
@@ -372,7 +372,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
             score = balanced_accuracy_score(y_va, y_pred)
             outer_scores.append(score)
 
-            print(f"Outer fold {fold} | Balanced Acc: {score:.3f}")
+            print(f"Outer fold {fold_sklearn} | Balanced Acc: {score:.3f}")
 
         print(
             f"\nNested CV Balanced Accuracy: "
