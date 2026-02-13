@@ -7,6 +7,7 @@ from pathlib import Path
 import umap
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from sklearn.metrics import roc_auc_score, balanced_accuracy_score, matthews_corrcoef
 
 def set_deterministic():
@@ -57,7 +58,8 @@ def plot_umap(z, y, epoch, split, fold):
 
 def linear_probe(z_train, y_train, z_val, y_val):
     
-    clf = LogisticRegression(max_iter=500)
+    # clf = LogisticRegression(max_iter=500)
+    clf = SVC(probability=True, random_state=42, class_weight="balanced")
     clf.fit(z_train, y_train)
 
     preds = clf.predict(z_val)
