@@ -224,19 +224,19 @@ def main(method, timepoints, fold):
 
         if epoch == 1:            
             best_val_loss = val_loss
-            best_val_metric = val_mcc
+            best_val_metric = val_roc_auc
             torch.save(model.state_dict(), f"{method}_fold{fold}_best_loss.pt")
             torch.save(model.state_dict(), f"{method}_fold{fold}_best_metric.pt")
             mlflow.log_artifact(f"{method}_fold{fold}_best_loss.pt")
             mlflow.log_artifact(f"{method}_fold{fold}_best_metric.pt")
         
-        if val_loss <= best_val_loss:
+        if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), f"{method}_fold{fold}_best_loss.pt")
             mlflow.log_artifact(f"{method}_fold{fold}_best_loss.pt")
         
-        if val_mcc >= best_val_metric:
-            best_val_metric = val_mcc
+        if val_roc_auc > best_val_metric:
+            best_val_metric = val_roc_auc
             torch.save(model.state_dict(), f"{method}_fold{fold}_best_metric.pt")
             mlflow.log_artifact(f"{method}_fold{fold}_best_metric.pt")
         
