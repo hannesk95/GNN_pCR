@@ -316,7 +316,7 @@ if __name__ == "__main__":
             for timepoints in [4]:
                 for fold in range(args.fold, args.fold+1):
 
-                    mlflow.set_tracking_uri("file:./mlruns")
+                    mlflow.set_tracking_uri("file:/dss/dssmcmlfs01/pn39hu/pn39hu-dss-0000/hannes/GNN_pCR/mlruns")
                     mlflow.set_experiment("miccai_2026")                
 
                     mlflow.end_run()  # end previous run if any
