@@ -225,23 +225,23 @@ def main(method, timepoints, fold):
         if epoch == 1:            
             best_val_loss = val_loss
             best_val_metric = val_mcc
-            torch.save(model.state_dict(), f"{method}_best_loss.pt")
-            torch.save(model.state_dict(), f"{method}_best_metric.pt")
-            mlflow.log_artifact(f"{method}_best_loss.pt")
-            mlflow.log_artifact(f"{method}_best_metric.pt")
+            torch.save(model.state_dict(), f"{method}_fold{fold}_best_loss.pt")
+            torch.save(model.state_dict(), f"{method}_fold{fold}_best_metric.pt")
+            mlflow.log_artifact(f"{method}_fold{fold}_best_loss.pt")
+            mlflow.log_artifact(f"{method}_fold{fold}_best_metric.pt")
         
         if val_loss <= best_val_loss:
             best_val_loss = val_loss
-            torch.save(model.state_dict(), f"{method}_best_loss.pt")
-            mlflow.log_artifact(f"{method}_best_loss.pt")
+            torch.save(model.state_dict(), f"{method}_fold{fold}_best_loss.pt")
+            mlflow.log_artifact(f"{method}_fold{fold}_best_loss.pt")
         
         if val_mcc >= best_val_metric:
             best_val_metric = val_mcc
-            torch.save(model.state_dict(), f"{method}_best_metric.pt")
-            mlflow.log_artifact(f"{method}_best_metric.pt")
+            torch.save(model.state_dict(), f"{method}_fold{fold}_best_metric.pt")
+            mlflow.log_artifact(f"{method}_fold{fold}_best_metric.pt")
         
-        torch.save(model.state_dict(), f"{method}_latest_epoch.pt")
-        mlflow.log_artifact(f"{method}_latest_epoch.pt")
+        torch.save(model.state_dict(), f"{method}_fold{fold}_latest_epoch.pt")
+        mlflow.log_artifact(f"{method}_fold{fold}_latest_epoch.pt")
     
     # Test evaluation
     test_loss_list = []
@@ -249,7 +249,7 @@ def main(method, timepoints, fold):
     test_pred_list = []
     test_score_list = []
 
-    model.load_state_dict(torch.load(f"{method}_best_metric.pt"))
+    model.load_state_dict(torch.load(f"{method}_fold{fold}_best_metric.pt"))
 
     model.eval()
     with torch.no_grad():
@@ -291,9 +291,9 @@ def main(method, timepoints, fold):
     mlflow.log_metric("test_roc_auc", test_roc_auc)
 
     # clean up
-    os.remove(f"{method}_best_loss.pt")
-    os.remove(f"{method}_best_metric.pt")
-    os.remove(f"{method}_latest_epoch.pt")    
+    os.remove(f"{method}_fold{fold}_best_loss.pt")
+    os.remove(f"{method}_fold{fold}_best_metric.pt")
+    os.remove(f"{method}_fold{fold}_latest_epoch.pt")    
 
 if __name__ == "__main__":    
 
