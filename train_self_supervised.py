@@ -258,18 +258,20 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
         mlflow.log_metric('linear_probe_mcc', linear_probe_mcc, step=epoch)
         
         if epoch == 1:
+            best_val_loss = val_losses['total']
+            best_val_metric = linear_probe_auc
             torch.save(model.state_dict(), f'{method}_fold{fold}_best_loss.pt') 
             torch.save(model.state_dict(), f'{method}_fold{fold}_best_metric.pt') 
             mlflow.log_artifact(f'{method}_fold{fold}_best_loss.pt')               
             mlflow.log_artifact(f'{method}_fold{fold}_best_metric.pt')
 
-        if val_losses['total'] <= best_val_loss:
+        if val_losses['total'] < best_val_loss:
             best_val_loss = val_losses['total']
             torch.save(model.state_dict(), f'{method}_fold{fold}_best_loss.pt')
             mlflow.log_artifact(f'{method}_fold{fold}_best_loss.pt')               
         
-        if linear_probe_mcc >= best_val_metric:
-            best_val_metric = linear_probe_mcc
+        if linear_probe_auc > best_val_metric:
+            best_val_metric = linear_probe_auc
             torch.save(model.state_dict(), f'{method}_fold{fold}_best_metric.pt')
             mlflow.log_artifact(f'{method}_fold{fold}_best_metric.pt')               
 
@@ -277,7 +279,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
         mlflow.log_artifact(f'{method}_fold{fold}_latest_epoch.pt') 
 
     mlflow.log_param('best_val_loss', best_val_loss)  
-    mlflow.log_param('best_val_bacc', best_val_metric)
+    mlflow.log_param('best_val_metric', best_val_metric)
 
     # Test evaluation
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
