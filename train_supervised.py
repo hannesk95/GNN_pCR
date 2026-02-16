@@ -304,7 +304,7 @@ if __name__ == "__main__":
                 for fold in range(5):
 
                     mlflow.set_tracking_uri("file:./mlruns")
-                    mlflow.set_experiment("miccai_2026")                
+                    mlflow.set_experiment("miccai_2026_auc")                
 
                     mlflow.end_run()  # end previous run if any
                     with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
@@ -317,7 +317,7 @@ if __name__ == "__main__":
                 for fold in range(args.fold, args.fold+1):
 
                     mlflow.set_tracking_uri("file:/dss/dssmcmlfs01/pn39hu/pn39hu-dss-0000/hannes/GNN_pCR/mlruns")
-                    mlflow.set_experiment("miccai_2026")                
+                    mlflow.set_experiment("miccai_2026_auc")                
 
                     mlflow.end_run()  # end previous run if any
                     with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
