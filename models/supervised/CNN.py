@@ -24,12 +24,7 @@ class CNN(nn.Module):
             nn.Linear(64, 2),
         )
 
-        def init_classifier(m):
-            if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
-                nn.init.zeros_(m.bias)
-
-        # self.classifier.apply(init_classifier)
+        self.dropout = nn.Dropout(p=0.5)
 
     def forward(self, images):
         """
@@ -41,7 +36,9 @@ class CNN(nn.Module):
         images = images.reshape(B * T, C, D, H, W)
         features = self.encoder(images)             # (B*T, 512)
         features = features.reshape(B, T, -1)       # (B, T, 512)
-        features = features.reshape(B, -1)          # (B, T*512)
+        features = features.reshape(B, -1)          # (B, -1)
+
+        features = self.dropout(features)
 
         logits = self.classifier(features)
 
