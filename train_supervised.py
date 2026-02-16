@@ -27,6 +27,7 @@ from sklearn.metrics import (
 
 from data.Dataset import ISPY2
 from models.supervised.CNN import CNN
+from models.supervised.CNN_distance import CNN_distance
 from models.supervised.CNN_LSTM import CNNLSTM
 from models.supervised.CNN_distance_LSTM import CNNdistLSTM
 from utils.utils import log_all_python_files, seed_worker, set_deterministic
@@ -51,7 +52,7 @@ def main(method, timepoints, fold):
     mlflow.log_param('epochs', EPOCHS) 
     mlflow.log_param('device', device)   
 
-    if method == "CNN_distLSTM":
+    if method in ["CNN_distance", "CNN_distLSTM"]:
         train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints, output_time_dists=True)
         val_dataset = ISPY2(split='val', fold=fold, timepoints=timepoints, output_time_dists=True)
         test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints, output_time_dists=True)
@@ -97,6 +98,8 @@ def main(method, timepoints, fold):
 
     if method == "CNN":
         model = CNN(num_timepoints=timepoints).cuda() 
+    elif method == "CNN_distance":
+        model = CNN_distance(num_timepoints=timepoints).cuda()
     elif method == "CNN_LSTM":
         model = CNNLSTM().cuda()
     elif method == "CNN_distLSTM":
@@ -130,7 +133,7 @@ def main(method, timepoints, fold):
             labels = batch_data[1].long().to(device)  # (B,)           
 
             with torch.amp.autocast("cuda"):
-                if method == "CNN_distLSTM":
+                if method in ["CNN_distance", "CNN_distLSTM"]:
                     time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
                     # time_dists = time_dists - torch.min(time_dists)
                     logits = model(images, time_dists)
@@ -171,7 +174,7 @@ def main(method, timepoints, fold):
                 labels = batch_data[1].long().to(device)  # (B,)           
 
                 with torch.amp.autocast("cuda"):
-                    if method == "CNN_distLSTM":
+                    if method in ["CNN_distance", "CNN_distLSTM"]:
                         time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
                         # time_dists = time_dists - torch.min(time_dists)
                         logits = model(images, time_dists)
@@ -258,7 +261,7 @@ def main(method, timepoints, fold):
             labels = batch_data[1].long().to(device)  # (B,)           
 
             with torch.amp.autocast("cuda"):
-                if method == "CNN_distLSTM":
+                if method in ["CNN_distance", "CNN_distLSTM"]:
                     time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
                     # time_dists = time_dists - torch.min(time_dists)
                     logits = model(images, time_dists)
@@ -299,7 +302,7 @@ if __name__ == "__main__":
 
     # If no fold is specified, run all folds sequentially (useful for local runs)
     if args.fold is None:
-        for method in ["CNN", "CNN_LSTM", "CNN_distLSTM"]:
+        for method in ["CNN_distance","CNN", "CNN_LSTM", "CNN_distLSTM"]:
             for timepoints in [4]:
                 for fold in range(5):
 
