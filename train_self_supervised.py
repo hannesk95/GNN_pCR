@@ -77,9 +77,15 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
     mlflow.log_param('device', device)
 
     # datasets
-    train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints)
-    val_dataset = ISPY2(split='val', fold=fold, timepoints=timepoints)
-    test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints)
+    if "dist" in method:
+        train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints, output_time_dists=True)
+        val_dataset = ISPY2(split='val', fold=fold, timepoints=timepoints, output_time_dists=True)
+        test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints, output_time_dists=True)
+    
+    else:
+        train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints)
+        val_dataset = ISPY2(split='val', fold=fold, timepoints=timepoints)
+        test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints)
 
     # Count samples per class
     patient_ids = torch.load(f"./data/breast_cancer/data_splits_{timepoints}_timepoints.pt")[fold]["train"]
@@ -126,6 +132,12 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
         enc.fit(np.array(perms).reshape(-1, 1))
 
     elif method == "janickova":
+        # model = ResNet18EncoderJanickova().to(device)
+        model = ResNet18EncoderJanickova_new().to(device)
+        model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        mlflow.log_param('model_num_params', model_num_params)
+    
+    elif method == "janickova_dist":
         # model = ResNet18EncoderJanickova().to(device)
         model = ResNet18EncoderJanickova_new().to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -216,7 +228,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
             mlflow.log_metric('val_temporal_loss', val_losses['temporal'], step=epoch)
             mlflow.log_metric('val_orthogonal_loss', val_losses['orthogonal'], step=epoch)
 
-        elif method == "janickova":
+        elif "janickova" in method:
             
             train_losses, train_z, train_y = train_epoch_janickova(
                 model=model,
@@ -228,7 +240,8 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
                 scaler=scaler,
                 epoch=epoch, 
                 accumulation_steps=ACCUMULATION_STEPS,
-                lr_scheduler=lr_scheduler
+                lr_scheduler=lr_scheduler,
+                method=method
             )
 
             val_losses, val_z, val_y = eval_epoch_janickova(
@@ -239,6 +252,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
                 align_labels=ALIGN_LABELS,
                 epoch=epoch,
                 accumulation_steps=ACCUMULATION_STEPS,
+                method=method
             )
 
             mlflow.log_metric('train_total_loss', train_losses['total'], step=epoch)
@@ -308,7 +322,8 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
             embeddings, labels = inference_janickova(
                     model=model,                
                     loader=[train_dl, val_dl, test_dl],
-                    device=device)          
+                    device=device,
+                    method=method)          
 
         X_train, y_train = embeddings["train"], labels["train"]
         X_val, y_val = embeddings["val"], labels["val"]
@@ -430,48 +445,48 @@ if __name__ == '__main__':
 
     # If no specific fold is provided, run all folds and all experiments (this will take a long time!)
     if args.fold is None:
-        # train and evaluate our method and perform loss function ablations        
-        for use_gnn in [True]:
-            for feature_sim in [None]:
-                for temperature in [None]:
-                    for skip_loss in [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]:
-                        for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
-                            for timepoints in [4]:
-                                for fold in range(5):
+        # # train and evaluate our method and perform loss function ablations        
+        # for use_gnn in [True]:
+        #     for feature_sim in [None]:
+        #         for temperature in [None]:
+        #             for skip_loss in [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]:
+        #                 for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+        #                     for timepoints in [4]:
+        #                         for fold in range(5):
                                     
-                                    args.skip_loss = skip_loss
+        #                             args.skip_loss = skip_loss
 
-                                    mlflow.set_tracking_uri("file:./mlruns")                    
-                                    mlflow.set_experiment(f"miccai_2026_auc")
+        #                             mlflow.set_tracking_uri("file:./mlruns")                    
+        #                             mlflow.set_experiment(f"miccai_2026_auc")
 
-                                    mlflow.end_run()  # end previous run if any
-                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+        #                             mlflow.end_run()  # end previous run if any
+        #                             with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+        #                                 main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
         
-        # train and evaluate our method without GNN but all losses
-        for use_gnn in [False]:
-            for feature_sim in [None]:
-                for temperature in [None]:
-                    for skip_loss in [None]:
-                        for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
-                            for timepoints in [4]:
-                                for fold in range(5):
+        # # train and evaluate our method without GNN but all losses
+        # for use_gnn in [False]:
+        #     for feature_sim in [None]:
+        #         for temperature in [None]:
+        #             for skip_loss in [None]:
+        #                 for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
+        #                     for timepoints in [4]:
+        #                         for fold in range(5):
                                     
-                                    args.skip_loss = skip_loss
+        #                             args.skip_loss = skip_loss
 
-                                    mlflow.set_tracking_uri("file:./mlruns")                    
-                                    mlflow.set_experiment(f"miccai_2026_auc")
+        #                             mlflow.set_tracking_uri("file:./mlruns")                    
+        #                             mlflow.set_experiment(f"miccai_2026_auc")
 
-                                    mlflow.end_run()  # end previous run if any
-                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+        #                             mlflow.end_run()  # end previous run if any
+        #                             with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+        #                                 main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
         
         # train and evaluate SSL comparison methods
         for use_gnn in [None]:
             for feature_sim in [None]:
                 for temperature in [None]:
                     for skip_loss in [None]:
-                        for method in ["kaczmarek", "janickova"]: # ["kiechle", "kaczmarek", "janickova"]:
+                        for method in ["janickova_dist", "kaczmarek", "janickova"]:
                             for timepoints in [4]:
                                 for fold in range(5):
                                     
