@@ -109,7 +109,7 @@ class ResNet18EncoderJanickova_new(nn.Module):
             nn.Linear(in_features=128, out_features=128)
         )
 
-    def forward(self, images):
+    def forward(self, images, time_distances=None):
         """images:   (B, T, C, D, H, W)
         """
         B, T, C, D, H, W = images.shape
@@ -119,6 +119,9 @@ class ResNet18EncoderJanickova_new(nn.Module):
         latent = self.projector(features)           # (B * T, 128)
 
         latent =  latent.reshape(B, T, -1)          # (B, T, 128)
+
+        if time_distances is not None:
+            latent = torch.cat((latent, time_distances), dim=-1)  # (B, T, 513)
 
         return latent
 
@@ -133,13 +136,17 @@ if __name__ == "__main__":
     
     images = torch.randn(BATCH_SIZE, TIMEPOINTS, CHANNELS, DEPTH, HEIGHT, WIDTH)
     images = images.cuda() 
+    time_distances = torch.randn(BATCH_SIZE, TIMEPOINTS, 1).cuda()
 
-    model = ResNet18EncoderJanickova().cuda()
+    # model = ResNet18EncoderJanickova().cuda()
     # summary(model, input_size=(TIMEPOINTS, CHANNELS, DEPTH, HEIGHT, WIDTH))
-    out = model(images)
-    print(out.shape)  
+    # out = model(images)
+    # print(out.shape)  
 
     model = ResNet18EncoderJanickova_new().cuda()
     # summary(model, input_size=(TIMEPOINTS, CHANNELS, DEPTH, HEIGHT, WIDTH))
     out = model(images)
+    print(out.shape)
+
+    out = model(images, time_distances)
     print(out.shape)
