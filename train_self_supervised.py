@@ -318,7 +318,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
                     loader=[train_dl, val_dl, test_dl],
                     device=device)
         
-        elif method == "janickova":
+        elif "janickova" in method:
             embeddings, labels = inference_janickova(
                     model=model,                
                     loader=[train_dl, val_dl, test_dl],
