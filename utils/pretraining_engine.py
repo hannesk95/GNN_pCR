@@ -20,7 +20,8 @@ def train_epoch_janickova(
         scaler = None,
         epoch = None,
         accumulation_steps = None,
-        lr_scheduler = None
+        lr_scheduler = None,
+        method = None
         
 ):
     """
@@ -56,12 +57,17 @@ def train_epoch_janickova(
     for step, batch_data in tqdm(enumerate(loader), total=len(loader)):        
         
         images = batch_data[0].float().to(device)
-        labels = batch_data[1].long().to(device) 
+        labels = batch_data[1].long().to(device)         
 
         B, T, C, D, H, W = images.shape          
         
         with torch.amp.autocast("cuda"):
-            latents = model(images)
+            
+            if "dist" in method:
+                time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                latents = model(images, time_dists)
+            else:
+                latents = model(images)
             latents = nn.functional.normalize(latents)
 
             latents_original = latents[:, :timepoints, :]
@@ -132,6 +138,7 @@ def eval_epoch_janickova(
         align_labels: list = [1.0],
         epoch = None,
         accumulation_steps = None,
+        method = None,
 ):
     """
     Evaluate the model for one epoch.
@@ -171,7 +178,11 @@ def eval_epoch_janickova(
             B, T, C, D, H, W = images.shape    
             
             with torch.amp.autocast("cuda"):
-                latents = model(images)
+                if "dist" in method:
+                    time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                    latents = model(images, time_dists)
+                else:
+                    latents = model(images)
                 latents = nn.functional.normalize(latents)
 
                 latents_original = latents[:, :timepoints, :]
@@ -219,7 +230,8 @@ def eval_epoch_janickova(
 def inference_janickova(
         model: nn.Module,                
         loader: DataLoader,
-        device: torch.device = 'cuda'
+        device: torch.device = 'cuda',
+        method = None,
 ):
     model.eval()
     
@@ -233,7 +245,12 @@ def inference_janickova(
 
             B, T, C, D, H, W = images.shape      
             
-            latents = model(images)                
+            if "dist" in method:
+                time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                latents = model(images, time_dists)
+            else:
+                latents = model(images)
+                       
             latents = nn.functional.normalize(latents, dim=-1)   
             latents = latents[:B, :T, :].reshape(B, -1)             
 
@@ -253,7 +270,11 @@ def inference_janickova(
 
             B, T, C, D, H, W = images.shape     
             
-            latents = model(images)                
+            if "dist" in method:
+                time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                latents = model(images, time_dists)
+            else:
+                latents = model(images)             
             latents = nn.functional.normalize(latents, dim=-1)
             latents = latents[:B, :T, :].reshape(B, -1)                     
 
@@ -273,7 +294,11 @@ def inference_janickova(
 
             B, T, C, D, H, W = images.shape     
             
-            latents = model(images)                
+            if "dist" in method:
+                time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                latents = model(images, time_dists)
+            else:
+                latents = model(images)               
             latents = nn.functional.normalize(latents, dim=-1)   
             latents = latents[:B, :T, :].reshape(B, -1)                  
 
