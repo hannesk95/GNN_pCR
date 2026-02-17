@@ -121,6 +121,7 @@ class ResNet18EncoderJanickova_new(nn.Module):
         latent =  latent.reshape(B, T, -1)          # (B, T, 128)
 
         if time_distances is not None:
+            time_distances = torch.cat([time_distances, time_distances], dim=1)
             latent = torch.cat((latent, time_distances), dim=-1)  # (B, T, 513)
 
         return latent
