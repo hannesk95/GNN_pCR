@@ -790,7 +790,11 @@ def inference_kiechle(
 
             B, T, C, D, H, W = images.shape     
             
-            latents = model(images)                
+            if "dist" in method:
+                time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                latents = model(images, time_dists)
+            else:
+                latents = model(images)                
             latents = nn.functional.normalize(latents, dim=-1)                   
 
             z_val.append(latents[:B, :].cpu())
@@ -808,7 +812,11 @@ def inference_kiechle(
 
             B, T, C, D, H, W = images.shape     
             
-            latents = model(images)                
+            if "dist" in method:
+                time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
+                latents = model(images, time_dists)
+            else:
+                latents = model(images)                
             latents = nn.functional.normalize(latents, dim=-1)                   
 
             z_test.append(latents[:B, :].cpu())
