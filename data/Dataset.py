@@ -35,7 +35,7 @@ class Recombine(MapTransform):
         return d
 
 class ISPY2(Dataset):
-    def __init__(self, split: str, fold: int, timepoints: int, output_2D: bool = False, output_time_dists: bool = False):
+    def __init__(self, split: str, fold: int, timepoints: int, output_2D: bool = False, output_time_dists: bool = False, output_time_dists_graph: bool = False):
 
         self.split = split
         self.fold = fold
@@ -45,7 +45,8 @@ class ISPY2(Dataset):
         self.transforms = None
         self.output_2D = output_2D
         self.output_time_dists = output_time_dists
-
+        self.output_time_dists_graph = output_time_dists_graph
+        
         if output_time_dists:
 
             train_patient_ids = torch.load(f"./data/breast_cancer/data_splits_4_timepoints.pt")[fold]['train']
@@ -63,6 +64,36 @@ class ISPY2(Dataset):
                 days_since_ref = [(d - ref).days for d in dates]
                 days_since_ref = days_since_ref[:self.timepoints]
                 time_diffs.extend(days_since_ref)
+            time_diffs = np.array(time_diffs, dtype=np.float32).reshape(-1, 1)  # (N*T, 1)
+            # self.scaler = StandardScaler()
+            self.scaler = MinMaxScaler()
+            self.scaler.fit(time_diffs)
+        
+        if output_time_dists_graph:
+            
+            train_patient_ids = torch.load(f"./data/breast_cancer/data_splits_4_timepoints.pt")[fold]['train']
+            
+            time_diffs = []
+            for patient_id in train_patient_ids:
+                files = sorted(glob(f"./data/breast_cancer/data_processed/{patient_id}/*.pt"))
+                dates_str = []
+                for file in files:
+                    dates_str.append(file.split("/")[-1].split("_")[1])
+                
+                dates = [datetime.strptime(d, "%Y-%m-%d") for d in dates_str]
+
+                date_0 = dates[0]
+                date_1 = dates[1]
+                date_2 = dates[2]
+                date_3 = dates[3]
+
+                time_diffs.append((date_1 - date_0).days)
+                time_diffs.append((date_2 - date_0).days)
+                time_diffs.append((date_3 - date_0).days)
+                time_diffs.append((date_2 - date_1).days)
+                time_diffs.append((date_3 - date_1).days)
+                time_diffs.append((date_3 - date_2).days)
+        
             time_diffs = np.array(time_diffs, dtype=np.float32).reshape(-1, 1)  # (N*T, 1)
             # self.scaler = StandardScaler()
             self.scaler = MinMaxScaler()
@@ -147,10 +178,10 @@ class ISPY2(Dataset):
         label = files[0].split('/')[-1].split('_')[-1].replace('.pt', '')
         label = torch.tensor(int(label))        
 
-        if not self.output_time_dists:
-            return data, label
+        # if not self.output_time_dists:
+        #     return data, label
         
-        else:
+        if self.output_time_dists and not self.output_time_dists_graph:
 
             dates_str = []
             for file in files:
@@ -169,3 +200,33 @@ class ISPY2(Dataset):
             time_dists = torch.from_numpy(days_since_ref).clone()
 
             return data, label, time_dists 
+
+        elif self.output_time_dists_graph and not self.output_time_dists:
+
+            dates_str = []
+            for file in files:
+                dates_str.append(file.split("/")[-1].split("_")[1])
+            
+            dates = [datetime.strptime(d, "%Y-%m-%d") for d in dates_str]
+
+            date_0 = dates[0]
+            date_1 = dates[1]
+            date_2 = dates[2]
+            date_3 = dates[3]
+
+            time_diffs = []
+            time_diffs.append((date_1 - date_0).days)
+            time_diffs.append((date_2 - date_0).days)
+            time_diffs.append((date_3 - date_0).days)
+            time_diffs.append((date_2 - date_1).days)
+            time_diffs.append((date_3 - date_1).days)
+            time_diffs.append((date_3 - date_2).days)
+
+            time_diffs = np.array(time_diffs, dtype=np.float32).reshape(-1, 1)  # (T*(T-1)/2, 1)
+            time_diffs = self.scaler.transform(time_diffs).flatten()  # (T*(T-1)/2,)
+            time_dists_graph = torch.from_numpy(time_diffs).clone()
+
+            return data, label, time_dists_graph
+
+        else:
+            return data, label

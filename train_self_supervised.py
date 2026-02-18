@@ -77,7 +77,12 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
     mlflow.log_param('device', device)
 
     # datasets
-    if "dist" in method:
+    if "dist_graph" in method:
+        train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints, output_time_dists_graph=True)
+        val_dataset = ISPY2(split='val', fold=fold, timepoints=timepoints, output_time_dists_graph=True)
+        test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints, output_time_dists_graph=True)
+
+    elif "dist" in method:
         train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints, output_time_dists=True)
         val_dataset = ISPY2(split='val', fold=fold, timepoints=timepoints, output_time_dists=True)
         test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints, output_time_dists=True)
@@ -121,7 +126,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
     val_dl = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, persistent_workers=True, worker_init_fn=seed_worker, generator=g)
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, persistent_workers=True, worker_init_fn=seed_worker, generator=g)
 
-    if method == "kaczmarek":
+    if "kaczmarek" in method:
         model = ResNet18EncoderKaczmarek(timepoints=timepoints).to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)
@@ -131,20 +136,14 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
         enc = OneHotEncoder()
         enc.fit(np.array(perms).reshape(-1, 1))
 
-    elif method == "janickova":
-        # model = ResNet18EncoderJanickova().to(device)
-        model = ResNet18EncoderJanickova_new().to(device)
-        model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        mlflow.log_param('model_num_params', model_num_params)
-    
-    elif method == "janickova_dist":
+    elif "janickova" in method:
         # model = ResNet18EncoderJanickova().to(device)
         model = ResNet18EncoderJanickova_new().to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)
 
-    elif method == "kiechle":
-        model = ResNet18EncoderKiechle(timepoints=timepoints, use_gnn=use_gnn).to(device)
+    elif "kiechle" in method:
+        model = ResNet18EncoderKiechle(timepoints=timepoints, use_gnn=use_gnn, method=method).to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)        
     
@@ -203,7 +202,8 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
                     lr_scheduler=lr_scheduler,
                     skip_loss=skip_loss,
                     feature_sim=feature_sim,
-                    temperature=temperature
+                    temperature=temperature,
+                    method=method
             )
 
             val_losses, val_z, val_y = eval_epoch_kiechle(
@@ -215,7 +215,8 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
                 accumulation_steps=ACCUMULATION_STEPS,
                 skip_loss=skip_loss,
                 feature_sim=feature_sim,
-                temperature=temperature
+                temperature=temperature,
+                method=method
             )
 
             mlflow.log_metric('train_total_loss', train_losses['total'], step=epoch)            
@@ -310,7 +311,8 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
             embeddings, labels = inference_kiechle(
                     model=model,                
                     loader=[train_dl, val_dl, test_dl],
-                    device=device)
+                    device=device,
+                    method=method)
         
         elif "kaczmarek" in method:
             embeddings, labels = inference_kaczmarek(
@@ -445,23 +447,24 @@ if __name__ == '__main__':
 
     # If no specific fold is provided, run all folds and all experiments (this will take a long time!)
     if args.fold is None:
-        # # train and evaluate our method and perform loss function ablations        
-        # for use_gnn in [True]:
-        #     for feature_sim in [None]:
-        #         for temperature in [None]:
-        #             for skip_loss in [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]:
-        #                 for method in ["kiechle"]: # ["kiechle", "kaczmarek", "janickova"]:
-        #                     for timepoints in [4]:
-        #                         for fold in range(5):
+        # train and evaluate our method and perform loss function ablations        
+        for use_gnn in [True]:
+            for feature_sim in [None]:
+                for temperature in [None]:
+                    # for skip_loss in [None, "alignment_loss", "temporal_loss", "orthogonality_loss"]:
+                    for skip_loss in [None]:
+                        for method in ["kiechle_dist", "kiechle_dist_graph"]: # ["kiechle", "kaczmarek", "janickova"]:
+                            for timepoints in [4]:
+                                for fold in range(5):
                                     
-        #                             args.skip_loss = skip_loss
+                                    args.skip_loss = skip_loss
 
-        #                             mlflow.set_tracking_uri("file:./mlruns")                    
-        #                             mlflow.set_experiment(f"miccai_2026_auc")
+                                    mlflow.set_tracking_uri("file:./mlruns")                    
+                                    mlflow.set_experiment(f"miccai_2026_auc")
 
-        #                             mlflow.end_run()  # end previous run if any
-        #                             with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-        #                                 main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+                                    mlflow.end_run()  # end previous run if any
+                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
         
         # # train and evaluate our method without GNN but all losses
         # for use_gnn in [False]:
@@ -481,23 +484,23 @@ if __name__ == '__main__':
         #                             with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
         #                                 main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
         
-        # train and evaluate SSL comparison methods
-        for use_gnn in [None]:
-            for feature_sim in [None]:
-                for temperature in [None]:
-                    for skip_loss in [None]:
-                        for method in ["janickova_dist", "kaczmarek", "janickova"]:
-                            for timepoints in [4]:
-                                for fold in range(5):
+        # # train and evaluate SSL comparison methods
+        # for use_gnn in [None]:
+        #     for feature_sim in [None]:
+        #         for temperature in [None]:
+        #             for skip_loss in [None]:
+        #                 for method in ["janickova_dist", "kaczmarek", "janickova"]:
+        #                     for timepoints in [4]:
+        #                         for fold in range(5):
                                     
-                                    args.skip_loss = skip_loss
+        #                             args.skip_loss = skip_loss
 
-                                    mlflow.set_tracking_uri("file:./mlruns")                    
-                                    mlflow.set_experiment(f"miccai_2026_auc")
+        #                             mlflow.set_tracking_uri("file:./mlruns")                    
+        #                             mlflow.set_experiment(f"miccai_2026_auc")
 
-                                    mlflow.end_run()  # end previous run if any
-                                    with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
-                                        main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
+        #                             mlflow.end_run()  # end previous run if any
+        #                             with mlflow.start_run(run_name=f"{method}_fold_{fold}"):
+        #                                 main(method, timepoints, fold, args.skip_loss, feature_sim, temperature, use_gnn)
     
     # If a specific fold is provided, only run that fold (useful for parallelization)
     else:

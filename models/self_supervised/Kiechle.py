@@ -127,6 +127,25 @@ class TemporalGNN(torch.nn.Module):
         x = self.conv2(x, edge_index)
         
         return x
+    
+class TemporalWeightGNN(torch.nn.Module):
+
+    def __init__(self, in_channels, out_channels):
+        super(TemporalWeightGNN, self).__init__()
+
+        self.conv1 = WeightedSAGEConv(in_channels, out_channels, aggr="mean")
+        self.conv2 = WeightedSAGEConv(out_channels, out_channels, aggr="mean")
+        self.relu = torch.nn.ReLU()
+        self.bn = BatchNorm(out_channels)
+
+    def forward(self, x, edge_index, edge_weight=None):
+
+        x = self.conv1(x, edge_index, edge_weight=edge_weight)
+        x = self.bn(x)
+        x = self.relu(x)        
+        x = self.conv2(x, edge_index, edge_weight=edge_weight)
+        
+        return x
 
 class LinearMLP(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -146,11 +165,12 @@ class LinearMLP(torch.nn.Module):
         return x
     
 class ResNet18EncoderKiechle(torch.nn.Module):
-    def __init__(self, timepoints, use_gnn=True):
+    def __init__(self, timepoints, use_gnn=True, method=""):
         super(ResNet18EncoderKiechle, self).__init__()
         
         self.use_gnn = use_gnn
         self.timepoints = timepoints
+        self.dist_method = "graph_edges" if "dist_graph" in method else "feature_append"
 
         model = monai.networks.nets.resnet18(spatial_dims=3, n_input_channels=3, num_classes=2)
         encoder_layers = list(model.children())[:-1]
@@ -158,15 +178,25 @@ class ResNet18EncoderKiechle(torch.nn.Module):
         self.encoder = nn.Sequential(*encoder_layers)
 
         if use_gnn:
-            self.gnn_projector = TemporalGNN(in_channels=512, out_channels=128)
+            if method == "kiechle_dist_graph":
+                self.gnn_projector = TemporalWeightGNN(in_channels=512, out_channels=128)
+            else:
+                self.gnn_projector = TemporalGNN(in_channels=512, out_channels=128)
         else:
             self.mlp_projector = LinearMLP(in_channels=512, out_channels=128)
         
 
-    def forward(self, images):
+    def forward(self, images, time_distances=None):
         """
         images:   (B, T, C, D, H, W)
         """
+
+        if time_distances is not None:
+            if self.dist_method == "graph_edges":
+                time_distances = time_distances.squeeze()
+                time_distances = time_distances.flatten().cuda()
+            else:
+                pass # do nothing as time distances are already in the correct shape for appending to feature vectors
 
         B, T, C, D, H, W = images.shape
    
@@ -187,17 +217,31 @@ class ResNet18EncoderKiechle(torch.nn.Module):
         # graph_data_transformed = graph_data_transformed.sort(sort_by_row=False)
 
         if self.use_gnn:
-            latents_original = self.gnn_projector(graph_data_original.x, graph_data_original.edge_index)  # (B*timepoints, 128)
+            if self.dist_method == "graph_edges":
+                latents_original = self.gnn_projector(graph_data_original.x, graph_data_original.edge_index, edge_weight=time_distances)  # (B*timepoints, 128)
+            else:
+                latents_original = self.gnn_projector(graph_data_original.x, graph_data_original.edge_index)  # (B*timepoints, 128)
         else:
             latents_original = self.mlp_projector(graph_data_original.x)  # (B*timepoints, 128)
         latents_original = latents_original.view(B, -1, latents_original.size(-1))
+
+        if self.dist_method == "feature_append":
+            latents_original = torch.cat([latents_original, time_distances], dim=-1)
+            
         latents_original = latents_original.flatten(start_dim=1) 
         
         if self.use_gnn:
-            latents_transformed = self.gnn_projector(graph_data_transformed.x, graph_data_transformed.edge_index)  # (B*timepoints, 128)
+            if self.dist_method == "graph_edges":
+                latents_transformed = self.gnn_projector(graph_data_transformed.x, graph_data_transformed.edge_index, edge_weight=time_distances)  # (B*timepoints, 128)
+            else:
+                latents_transformed = self.gnn_projector(graph_data_transformed.x, graph_data_transformed.edge_index)  # (B*timepoints, 128)
         else:
             latents_transformed = self.mlp_projector(graph_data_transformed.x)  # (B*timepoints, 128)
         latents_transformed = latents_transformed.view(B, -1, latents_transformed.size(-1))
+
+        if self.dist_method == "feature_append":
+            latents_transformed = torch.cat([latents_transformed, time_distances], dim=-1)
+
         latents_transformed = latents_transformed.flatten(start_dim=1) 
         
         latents = torch.concat([latents_original, latents_transformed], dim=0)
