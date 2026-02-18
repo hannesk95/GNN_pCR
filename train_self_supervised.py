@@ -157,7 +157,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
 
     for epoch in tqdm(range(1,EPOCHS+1)):
 
-        if method == "kaczmarek":
+        if "kaczmarek" in method:
             train_losses, train_z, train_y = train_epoch_kaczmarek(
                 model=model,
                 loader=train_dl,
@@ -189,7 +189,7 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
             mlflow.log_metric('val_align_loss', val_losses['align'], step=epoch)
             mlflow.log_metric('val_temporal_loss', val_losses['temporal'], step=epoch)
             
-        elif method == "kiechle":                
+        elif "kiechle" in method:                
             
             train_losses, train_z, train_y = train_epoch_kiechle(
                     model=model,                    
@@ -306,13 +306,13 @@ def main(method, timepoints, fold, skip_loss, feature_sim, temperature, use_gnn)
 
         model.load_state_dict(torch.load(checkpoint))        
 
-        if method == "kiechle":
+        if "kiechle" in method:
             embeddings, labels = inference_kiechle(
                     model=model,                
                     loader=[train_dl, val_dl, test_dl],
                     device=device)
         
-        elif method == "kaczmarek":
+        elif "kaczmarek" in method:
             embeddings, labels = inference_kaczmarek(
                     model=model,                
                     loader=[train_dl, val_dl, test_dl],
