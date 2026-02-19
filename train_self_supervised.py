@@ -515,7 +515,7 @@ if __name__ == '__main__':
                                     
                                     args.skip_loss = skip_loss
 
-                                    mlflow.set_tracking_uri("file:/dss/dssmcmlfs01/pn39hu/pn39hu-dss-0000/hannes/GNN_pCR/mlruns")                    
+                                    mlflow.set_tracking_uri("file:./mlruns")                    
                                     mlflow.set_experiment(f"miccai_2026_auc")
 
                                     mlflow.end_run()  # end previous run if any
@@ -533,7 +533,7 @@ if __name__ == '__main__':
                                     
                                     args.skip_loss = skip_loss
 
-                                    mlflow.set_tracking_uri("file:/dss/dssmcmlfs01/pn39hu/pn39hu-dss-0000/hannes/GNN_pCR/mlruns")                    
+                                    mlflow.set_tracking_uri("file:./mlruns")                    
                                     mlflow.set_experiment(f"miccai_2026_auc")
 
                                     mlflow.end_run()  # end previous run if any
@@ -551,7 +551,7 @@ if __name__ == '__main__':
                                     
                                     args.skip_loss = skip_loss
 
-                                    mlflow.set_tracking_uri("file:/dss/dssmcmlfs01/pn39hu/pn39hu-dss-0000/hannes/GNN_pCR/mlruns")                   
+                                    mlflow.set_tracking_uri("file:./mlruns")                   
                                     mlflow.set_experiment(f"miccai_2026_auc")
 
                                     mlflow.end_run()  # end previous run if any
