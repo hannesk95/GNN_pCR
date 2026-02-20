@@ -62,7 +62,7 @@ class ISPY2(Dataset):
         
                 ref = dates[0]
                 days_since_ref = [(d - ref).days for d in dates]
-                days_since_ref = days_since_ref[:self.timepoints]
+                # days_since_ref = days_since_ref[:self.timepoints]
                 time_diffs.extend(days_since_ref)
             time_diffs = np.array(time_diffs, dtype=np.float32).reshape(-1, 1)  # (N*T, 1)
             # self.scaler = StandardScaler()
@@ -198,6 +198,7 @@ class ISPY2(Dataset):
             days_since_ref = np.array(days_since_ref, dtype=np.float32).reshape(-1, 1)  # (T, 1)
             days_since_ref = self.scaler.transform(days_since_ref).flatten()  # (T,)
             time_dists = torch.from_numpy(days_since_ref).clone()
+            time_dists = time_dists[:self.timepoints]  # ensure correct length
 
             return data, label, time_dists 
 

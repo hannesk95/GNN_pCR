@@ -16,9 +16,9 @@ from sklearn.svm import SVC
 
 from data.Dataset import ISPY2
 
-from models.Janickova import ResNet18EncoderJanickova
-from models.Kaczmarek import ResNet18EncoderKaczmarek
-from models.Kiechle import ResNet18EncoderKiechle
+from models.self_supervised.Janickova import ResNet18EncoderJanickova_new
+from models.self_supervised.Kaczmarek import ResNet18EncoderKaczmarek
+from models.self_supervised.Kiechle import ResNet18EncoderKiechle
 
 from utils.pretraining_engine import (
     inference_janickova,
@@ -40,48 +40,57 @@ def main(method, timepoints, fold, checkpoint_path):
     mlflow.log_param('fold', fold)   
 
     # datasets
-    train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints)
-    val_dataset = ISPY2(split='val', fold=fold, timepoints=timepoints)
-    test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints)    
+    if "dist" in method:
+        train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints, output_time_dists=True)
+        val_dataset = ISPY2(split='val', fold=fold, timepoints=timepoints, output_time_dists=True)
+        test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints, output_time_dists=True)
+    
+    else:
+        train_dataset = ISPY2(split='train', fold=fold, timepoints=timepoints)
+        val_dataset = ISPY2(split='val', fold=fold, timepoints=timepoints)
+        test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints)    
 
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=False, num_workers=4)
     val_dl = torch.utils.data.DataLoader(val_dataset, batch_size=16, shuffle=False, num_workers=4)
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4)
 
-    if method == "kaczmarek":
+    if "kaczmarek" in method:
         model = ResNet18EncoderKaczmarek(timepoints=timepoints).to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)
 
-    elif method == "janickova":
-        model = ResNet18EncoderJanickova().to(device)
+    elif "janickova" in method:
+        model = ResNet18EncoderJanickova_new().to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         mlflow.log_param('model_num_params', model_num_params)
 
-    elif method == "kiechle":
-        model = ResNet18EncoderKiechle(timepoints=timepoints).to(device)
+    elif "kiechle" in method:
+        model = ResNet18EncoderKiechle(timepoints=timepoints, use_gnn=True, method=method).to(device)
         model_num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        mlflow.log_param('model_num_params', model_num_params)    
+        mlflow.log_param('model_num_params', model_num_params)        
+        
 
     model.load_state_dict(torch.load(checkpoint_path, map_location=device))        
 
-    if method == "kiechle":
+    if "kiechle" in method:
         embeddings, labels = inference_kiechle(
                 model=model,                
                 loader=[train_dl, val_dl, test_dl],
-                device=device)
+                device=device,
+                method=method)
     
-    elif method == "kaczmarek":
+    elif "kaczmarek" in method:
         embeddings, labels = inference_kaczmarek(
                 model=model,                
                 loader=[train_dl, val_dl, test_dl],
                 device=device)
     
-    elif method == "janickova":
+    elif "janickova" in method:
         embeddings, labels = inference_janickova(
                 model=model,                
                 loader=[train_dl, val_dl, test_dl],
-                device=device)          
+                device=device,
+                method=method)          
 
     X_train, y_train = embeddings["train"], labels["train"]
     X_val, y_val = embeddings["val"], labels["val"]
@@ -199,33 +208,42 @@ def main(method, timepoints, fold, checkpoint_path):
 if __name__ == '__main__':  
 
     janickova_dict = {
-        "fold_0_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/6b5e7d28c10f45bb9764249674071194/artifacts/model_best_metric.pt",
-        "fold_1_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/f8d20bc2b7f24ef59d32cd39bc450822/artifacts/model_best_metric.pt",
-        "fold_2_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/c9e29e39047a4ecb875e9aefa11dde41/artifacts/model_best_metric.pt",
-        "fold_3_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/8ca90dc5a545447ab92ad3558021bf9a/artifacts/model_best_metric.pt",
-        "fold_4_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/d3122546d2584227bbebb1ac69099abe/artifacts/model_best_metric.pt",
+        "fold_0_best_metric": "",
+        "fold_1_best_metric": "",
+        "fold_2_best_metric": "",
+        "fold_3_best_metric": "",
+        "fold_4_best_metric": "",
     }
 
-    kaczmarek_dict = {
-        "fold_0_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/0a21a08722934f0c9828562f28c40228/artifacts/model_best_metric.pt",
-        "fold_1_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/365c1881d08842c991f946842dd50099/artifacts/model_best_metric.pt",
-        "fold_2_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/9001a9be12e748109ca1733bf94b25ff/artifacts/model_best_metric.pt",
-        "fold_3_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/db5f8ab18a6c43f3ac0683ae7b0afe08/artifacts/model_best_metric.pt",
-        "fold_4_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/15990b1778f048e6af52e03a94d2632c/artifacts/model_best_metric.pt",
+    janickova_dist_dict = {
+        "fold_0_best_metric": "",
+        "fold_1_best_metric": "",
+        "fold_2_best_metric": "",
+        "fold_3_best_metric": "",
+        "fold_4_best_metric": "",
     }
     
     kiechle_dict = {
-        "fold_0_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/842766c839d046b4a11c33b099bb8889/artifacts/model_best_metric.pt",
-        "fold_1_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/be4dbfa23308407d8228de9d10e7a47e/artifacts/model_best_metric.pt",
-        "fold_2_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/289cc2ceb0de4c88a87627dbb55495ae/artifacts/model_best_metric.pt",
-        "fold_3_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/cfe81c53ee7547ec9eb4aff3381ee894/artifacts/model_best_metric.pt",
-        "fold_4_best_metric": "/media/johannes/SSD_2.0TB/GNN_pCR/mlruns/444397975483896963/c5f3a343737c40299527ae686a73d576/artifacts/model_best_metric.pt",
+        "fold_0_best_metric": "",
+        "fold_1_best_metric": "",
+        "fold_2_best_metric": "",
+        "fold_3_best_metric": "",
+        "fold_4_best_metric": "",
+    }
+    
+    kiechle_dist_dict = {
+        "fold_0_best_metric": "",
+        "fold_1_best_metric": "",
+        "fold_2_best_metric": "",
+        "fold_3_best_metric": "",
+        "fold_4_best_metric": "",
     }
 
     checkpoints_dict = {
         "janickova": janickova_dict,
-        "kaczmarek": kaczmarek_dict,
+        "janickova_dist": janickova_dist_dict,
         "kiechle": kiechle_dict,
+        "kiechle_dist": kiechle_dist_dict,
     }    
 
     for method in checkpoints_dict.keys():        

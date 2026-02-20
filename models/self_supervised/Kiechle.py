@@ -170,7 +170,7 @@ class ResNet18EncoderKiechle(torch.nn.Module):
         
         self.use_gnn = use_gnn
         self.timepoints = timepoints
-        self.dist_method = "graph_edges" if "dist_graph" in method else "feature_append"
+        self.dist_method = "graph_edges" if method == "kiechle_dist_graph" else "feature_append" if method == "kiechle_dist" else None
 
         model = monai.networks.nets.resnet18(spatial_dims=3, n_input_channels=3, num_classes=2)
         encoder_layers = list(model.children())[:-1]
@@ -178,10 +178,10 @@ class ResNet18EncoderKiechle(torch.nn.Module):
         self.encoder = nn.Sequential(*encoder_layers)
 
         if use_gnn:
+            self.gnn_projector = TemporalGNN(in_channels=512, out_channels=128)
+
             if method == "kiechle_dist_graph":
-                self.gnn_projector = TemporalWeightGNN(in_channels=512, out_channels=128)
-            else:
-                self.gnn_projector = TemporalGNN(in_channels=512, out_channels=128)
+                self.gnn_projector = TemporalWeightGNN(in_channels=512, out_channels=128)               
         else:
             self.mlp_projector = LinearMLP(in_channels=512, out_channels=128)
         
