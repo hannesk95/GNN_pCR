@@ -4,7 +4,7 @@ sys.path.append("/home/johannes/Data/SSD_2.0TB/GNN_pCR/")
 import monai
 import torch
 import torch.nn as nn
-from torch_geometric.nn.conv import SAGEConv
+from torch_geometric.nn.conv import SAGEConv, GraphConv
 from typing import List, Optional, Tuple, Union
 
 import torch.nn.functional as F
@@ -133,8 +133,8 @@ class TemporalWeightGNN(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(TemporalWeightGNN, self).__init__()
 
-        self.conv1 = WeightedSAGEConv(in_channels, out_channels, aggr="mean")
-        self.conv2 = WeightedSAGEConv(out_channels, out_channels, aggr="mean")
+        self.conv1 = GraphConv(in_channels, out_channels, aggr="add")
+        self.conv2 = GraphConv(out_channels, out_channels, aggr="add")
         self.relu = torch.nn.ReLU()
         self.bn = BatchNorm(out_channels)
 
