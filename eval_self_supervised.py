@@ -208,35 +208,35 @@ def main(method, timepoints, fold, checkpoint_path):
 if __name__ == '__main__':  
 
     janickova_dict = {
-        "fold_0_best_metric": "",
-        "fold_1_best_metric": "",
-        "fold_2_best_metric": "",
-        "fold_3_best_metric": "",
-        "fold_4_best_metric": "",
+        "fold_0_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/cc093e8143e34b7a81582b22f45cd718/artifacts/janickova_fold0_best_metric.pt",
+        "fold_1_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/3344eec89ff14b0381df554756045de7/artifacts/janickova_fold1_best_metric.pt",
+        "fold_2_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/5ab43434473d49758e5b8274452bb6fd/artifacts/janickova_fold2_best_metric.pt",
+        "fold_3_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/5ab43434473d49758e5b8274452bb6fd/artifacts/janickova_fold2_best_metric.pt",
+        "fold_4_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/87b05728f86f42e3a4902360f02641c8/artifacts/janickova_fold4_best_metric.pt",
     }
 
     janickova_dist_dict = {
-        "fold_0_best_metric": "",
-        "fold_1_best_metric": "",
-        "fold_2_best_metric": "",
-        "fold_3_best_metric": "",
-        "fold_4_best_metric": "",
+        "fold_0_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/2dea4505c6584e42b7fee3b1ed64bb07/artifacts/janickova_dist_fold0_best_metric.pt",
+        "fold_1_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/e49818f0b402490280321c7565665c60/artifacts/janickova_dist_fold1_best_metric.pt",
+        "fold_2_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/b94104e40fbc47e085c89d34c2778040/artifacts/janickova_dist_fold2_best_metric.pt",
+        "fold_3_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/cc69f6ef31874dcf8b195aec1cf6c6a8/artifacts/janickova_dist_fold3_best_metric.pt",
+        "fold_4_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/fc484a86770342cea6f614115e25ecd0/artifacts/janickova_dist_fold4_best_metric.pt",
     }
     
     kiechle_dict = {
-        "fold_0_best_metric": "",
-        "fold_1_best_metric": "",
-        "fold_2_best_metric": "",
-        "fold_3_best_metric": "",
-        "fold_4_best_metric": "",
+        "fold_0_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/da8a419f53d743219e3dc3781ee15133/artifacts/kiechle_fold0_best_metric.pt",
+        "fold_1_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/a9fc380ec497450caae9590496e02b72/artifacts/kiechle_fold1_best_metric.pt",
+        "fold_2_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/21e06599459042daa06af68560a3f015/artifacts/kiechle_fold2_best_metric.pt",
+        "fold_3_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/0ec3b8024f284be8ae247d65e606d2e2/artifacts/kiechle_fold3_best_metric.pt",
+        "fold_4_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/934361574672003107/ecc8c6e0bc9d410998d1a39a876058b6/artifacts/kiechle_fold4_best_metric.pt",
     }
     
     kiechle_dist_dict = {
-        "fold_0_best_metric": "",
-        "fold_1_best_metric": "",
-        "fold_2_best_metric": "",
-        "fold_3_best_metric": "",
-        "fold_4_best_metric": "",
+        "fold_0_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/218090741956908917/f72bb98fb4a343fcbbf07a0f845d55d9/artifacts/kiechle_dist_fold0_best_metric.pt",
+        "fold_1_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/218090741956908917/4e2467f3edaf4f8184892f712a639bc5/artifacts/kiechle_dist_fold1_best_metric.pt",
+        "fold_2_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/218090741956908917/466f2e0b3ce049a5a540438ca55e49ed/artifacts/kiechle_dist_fold2_best_metric.pt",
+        "fold_3_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/218090741956908917/da51a90d659e410290b308e6728c0af5/artifacts/kiechle_dist_fold3_best_metric.pt",
+        "fold_4_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/218090741956908917/1b8f8ef845c641ca9256ef1c13773b77/artifacts/kiechle_dist_fold4_best_metric.pt",
     }
 
     checkpoints_dict = {
@@ -247,13 +247,13 @@ if __name__ == '__main__':
     }    
 
     for method in checkpoints_dict.keys():        
-        for timepoints in [4]:
+        for timepoints in [2, 3]:
             for fold in range(5):
                 
                 checkpoint_path = checkpoints_dict[method][f"fold_{fold}_best_metric"]
                 
                 mlflow.set_tracking_uri("file:./mlruns")
-                mlflow.set_experiment("self-supervised-pretraining_evaluation")
+                mlflow.set_experiment("early_response_prediction")
                 
                 mlflow.end_run()  # end previous run if any
                 with mlflow.start_run():          
