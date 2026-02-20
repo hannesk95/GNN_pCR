@@ -90,7 +90,7 @@ def main(method, timepoints, fold, checkpoint_path):
 
             with torch.amp.autocast("cuda"):
                 if "dist" in method:
-                    time_dists = batch_data[2].float().to(device)  # (B, T)
+                    time_dists = batch_data[2].unsqueeze(-1).float().to(device)  # (B, T, 1)
                     logits = model(images, time_dists)
                 else:
                     logits = model(images)                
