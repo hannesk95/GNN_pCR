@@ -95,8 +95,8 @@ class ISPY2(Dataset):
                 time_diffs.append((date_3 - date_2).days)
         
             time_diffs = np.array(time_diffs, dtype=np.float32).reshape(-1, 1)  # (N*T, 1)
-            # self.scaler = StandardScaler()
-            self.scaler = MinMaxScaler()
+            self.scaler = StandardScaler()
+            # self.scaler = MinMaxScaler()
             self.scaler.fit(time_diffs)
         
         if split in ["train"]:
