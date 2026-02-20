@@ -40,7 +40,7 @@ class CNN(nn.Module):
 
         features = self.dropout(features)
 
-        # if timepoints less than 4, pad with zeros
+        # if timepoints less than 4, pad with zeros (only for early response prediction)
         if T < 4:
             padding = torch.zeros(B, (4 - T) * 512).cuda()
             features = torch.cat((features, padding), dim=1)
