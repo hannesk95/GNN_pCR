@@ -31,6 +31,8 @@ from sklearn.metrics import (
 
 from data.Dataset import ISPY2
 from models.supervised.CNN import CNN
+from models.supervised.CNN_distance import CNN_distance
+from models.supervised.CNN_LSTM import CNNLSTM
 from models.supervised.CNN_distance_LSTM import CNNdistLSTM
 from utils.utils import log_all_python_files, seed_worker, set_deterministic
 
@@ -51,7 +53,7 @@ def main(method, timepoints, fold, checkpoint_path):
     mlflow.log_param('batch_size', BATCH_SIZE) 
     mlflow.log_param('device', device)   
 
-    if method == "CNN_distLSTM":
+    if method in ["CNN_distance", "CNN_distLSTM"]:
         test_dataset = ISPY2(split='test', fold=fold, timepoints=timepoints, output_time_dists=True)
     
     else:
@@ -59,13 +61,14 @@ def main(method, timepoints, fold, checkpoint_path):
 
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
-    if method == "CNN_LSTM":
-        # model = CNNLSTM().cuda()
-        model = CNNdistLSTM().cuda()
+    if method == "CNN":
+        model = CNN(num_timepoints=timepoints).cuda() 
+    elif method == "CNN_distance":
+        model = CNN_distance(num_timepoints=timepoints).cuda()
+    elif method == "CNN_LSTM":
+        model = CNNLSTM().cuda()
     elif method == "CNN_distLSTM":
-        model = CNNdistLSTM().cuda()
-    elif method == "CNN":
-        model = CNN(num_timepoints=timepoints).cuda()    
+        model = CNNdistLSTM().cuda()       
     else:
         raise ValueError(f"Unknown method: {method}")    
     
@@ -77,7 +80,7 @@ def main(method, timepoints, fold, checkpoint_path):
     test_pred_list = []
     test_score_list = []
 
-    model.load_state_dict(torch.load(checkpoint_path))
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
 
     model.eval()
     with torch.no_grad():
@@ -86,7 +89,7 @@ def main(method, timepoints, fold, checkpoint_path):
             labels = batch_data[1].long().to(device)  # (B,)           
 
             with torch.amp.autocast("cuda"):
-                if method == "CNN_distLSTM":
+                if "dist" in method:
                     time_dists = batch_data[2].float().to(device)  # (B, T)
                     logits = model(images, time_dists)
                 else:
@@ -116,34 +119,52 @@ def main(method, timepoints, fold, checkpoint_path):
 if __name__ == "__main__":    
 
     cnn_dict = {
-        "fold_0_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/6b5e7d28c10f45bb9764249674071194/artifacts/model_best_metric.pt",
-        "fold_1_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/f8d20bc2b7f24ef59d32cd39bc450822/artifacts/model_best_metric.pt",
-        "fold_2_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/c9e29e39047a4ecb875e9aefa11dde41/artifacts/model_best_metric.pt",
-        "fold_3_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/8ca90dc5a545447ab92ad3558021bf9a/artifacts/model_best_metric.pt",
-        "fold_4_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/d3122546d2584227bbebb1ac69099abe/artifacts/model_best_metric.pt",
+        "fold_0_best_metric": "",
+        "fold_1_best_metric": "",
+        "fold_2_best_metric": "",
+        "fold_3_best_metric": "",
+        "fold_4_best_metric": "",
+    }
+
+    cnn_dist_dict = {
+        "fold_0_best_metric": "",
+        "fold_1_best_metric": "",
+        "fold_2_best_metric": "",
+        "fold_3_best_metric": "",
+        "fold_4_best_metric": "",
     }
 
     cnn_lstm_dict = {
-        "fold_0_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/0a21a08722934f0c9828562f28c40228/artifacts/model_best_metric.pt",
-        "fold_1_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/365c1881d08842c991f946842dd50099/artifacts/model_best_metric.pt",
-        "fold_2_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/9001a9be12e748109ca1733bf94b25ff/artifacts/model_best_metric.pt",
-        "fold_3_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/db5f8ab18a6c43f3ac0683ae7b0afe08/artifacts/model_best_metric.pt",
-        "fold_4_best_metric": "/home/johannes/Code/GNN_pCR/mlruns/3/15990b1778f048e6af52e03a94d2632c/artifacts/model_best_metric.pt",
+        "fold_0_best_metric": "",
+        "fold_1_best_metric": "",
+        "fold_2_best_metric": "",
+        "fold_3_best_metric": "",
+        "fold_4_best_metric": "",
+    } 
+
+    cnn_dist_lstm_dict = {
+        "fold_0_best_metric": "",
+        "fold_1_best_metric": "",
+        "fold_2_best_metric": "",
+        "fold_3_best_metric": "",
+        "fold_4_best_metric": "",
     }    
 
     checkpoints_dict = {
         "CNN": cnn_dict,
+        "CNN_distance": cnn_dist_dict,
         "CNN_LSTM": cnn_lstm_dict,
+        "CNN_distLSTM": cnn_dist_lstm_dict,
     }    
 
     for method in checkpoints_dict.keys():  
-        for timepoints in [3]:
+        for timepoints in [2, 3]:
             for fold in range(5):
 
                 checkpoint_path = checkpoints_dict[method][f"fold_{fold}_best_metric"]
 
                 mlflow.set_tracking_uri("file:./mlruns")
-                mlflow.set_experiment("end-to-end_3_timepoints")
+                mlflow.set_experiment("early_response_prediction")
 
                 mlflow.end_run()  # end previous run if any
                 with mlflow.start_run():

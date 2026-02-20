@@ -17,7 +17,7 @@ class CNN_distance(nn.Module):
 
         # Classifier
         self.classifier = nn.Sequential(
-            nn.Linear((512 + 1) * num_timepoints, 256),
+            nn.Linear((512 + 1) * 4, 256),
             nn.ReLU(inplace=True),
             nn.Linear(256, 64),
             nn.ReLU(inplace=True),
@@ -47,6 +47,11 @@ class CNN_distance(nn.Module):
         # append distances to features
         features = torch.cat((features, distances), dim=-1)  # (B, T, 513)
         features = features.reshape(B, -1)          # (B, T*513)
+
+        # if timepoints less than 4, pad with zeros
+        if T < 4:
+            padding = torch.zeros(B, (4 - T) * (512 + 1)).cuda()
+            features = torch.cat((features, padding), dim=1)
 
         logits = self.classifier(features)
 

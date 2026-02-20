@@ -17,7 +17,7 @@ class CNN(nn.Module):
 
         # Classifier
         self.classifier = nn.Sequential(
-            nn.Linear(512 * num_timepoints, 256),
+            nn.Linear(512 * 4, 256),
             nn.ReLU(inplace=True),
             nn.Linear(256, 64),
             nn.ReLU(inplace=True),
@@ -39,6 +39,11 @@ class CNN(nn.Module):
         features = features.reshape(B, -1)          # (B, -1)
 
         features = self.dropout(features)
+
+        # if timepoints less than 4, pad with zeros
+        if T < 4:
+            padding = torch.zeros(B, (4 - T) * 512).cuda()
+            features = torch.cat((features, padding), dim=1)
 
         logits = self.classifier(features)
 
